@@ -21,21 +21,29 @@ Window {
         //     height: parent.height
         // }
 
-        Rectangle {
-            anchors.fill: parent
-            color: "transparent"
-            border.color: "green"
-            border.width: 2
+        // Rectangle {
+        //     anchors.fill: parent
+        //     color: "transparent"
+        //     border.color: "green"
+        //     border.width: 2
 
-            Text {
-                text: "GStreamer Rendering"
-                font.family: "Fira Code"
-                color: "green"
-                font.pixelSize: 24
-                anchors.top: parent.top
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.topMargin: 40
-            }
+        //     Text {
+        //         text: "GStreamer Rendering"
+        //         font.family: "Fira Code"
+        //         color: "green"
+        //         font.pixelSize: 24
+        //         anchors.top: parent.top
+        //         anchors.horizontalCenter: parent.horizontalCenter
+        //         anchors.topMargin: 40
+        //     }
+        // }
+
+        Text {
+            text: "Hello, Taurus!"
+            font.family: "Fira Code"
+            color: "white"
+            font.pixelSize: 32
+            anchors.centerIn: parent
         }
     }
 

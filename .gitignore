@@ -90,3 +90,7 @@ CMakeLists.txt.user*
 .idea/
 .github/
 .cache/
+
+# Build output
+build*/
+bin/

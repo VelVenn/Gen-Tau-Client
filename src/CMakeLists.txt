@@ -6,10 +6,12 @@ qt_add_executable(${APP_NAME}
 
 qt_add_qml_module(${APP_NAME}
     URI Gentau.UI
-    VERSION ${PROJECT_VERSION}
+    VERSION ${QML_MODULE_VERSION_MAJOR}.${QML_MODULE_VERSION_MINOR}
     QML_FILES
         app/qml/Main.qml
 )
+
+message("Building ${APP_NAME} version ${PROJECT_VERSION}")
 
 set_target_properties(${APP_NAME} PROPERTIES
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
