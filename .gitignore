@@ -91,6 +91,8 @@ CMakeLists.txt.user*
 .github/
 .cache/
 
+*.qmlls.ini
+
 # Build output
 build*/
 bin/

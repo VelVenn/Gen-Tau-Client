@@ -1,3 +1,3 @@
-# $\mathbb{G}\text{en}\bm{\tau}$
+![](assets/Gentau-colored.png)
 
-$\mathbb{G}\text{en}\bm{\tau}$ (Gen-Tau) is the Custom Client of SCAU Taurus.
+Gen-Tau is the Custom Client of SCAU Taurus.
