@@ -84,6 +84,7 @@ CMakeLists.txt.user*
 # Customize
 *compile_commands.json
 *.env
+*.clangd
 
 # IDE specific ignores
 .vscode/
@@ -96,3 +97,5 @@ CMakeLists.txt.user*
 # Build output
 build*/
 bin/
+
+*tmp*.txt

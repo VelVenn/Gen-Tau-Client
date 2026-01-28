@@ -1,5 +1,9 @@
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/bin)
 
+add_subdirectory(conf)
+add_subdirectory(utils)
+add_subdirectory(vid_render)
+
 qt_add_executable(${APP_NAME}
     main.cpp
 )

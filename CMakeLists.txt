@@ -16,6 +16,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(QML_MODULE_VERSION_MAJOR 1)
 set(QML_MODULE_VERSION_MINOR 0)
 
+set(GEN_TAU_LIB_NAMESPACE Gentau::)
+
 find_package(Qt6 6.8 REQUIRED COMPONENTS Quick)
 find_package(PkgConfig REQUIRED)
 
@@ -24,11 +26,10 @@ pkg_check_modules(GST_VID REQUIRED IMPORTED_TARGET gstreamer-video-1.0)
 
 qt_standard_project_setup(REQUIRES 6.8)
 
-option(BUILD_GEN_TAU_TESTS "Build Genτ tests" ON)
+add_subdirectory(src)
 
+option(BUILD_GEN_TAU_TESTS "Build Genτ tests" ON)
 if(BUILD_GEN_TAU_TESTS)
     # enable_testing()
     add_subdirectory(tests)
 endif()
-
-add_subdirectory(src)
