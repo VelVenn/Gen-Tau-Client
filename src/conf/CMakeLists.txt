@@ -1,6 +1,11 @@
-if(CMAKE_BUILD_TYPE MATCHES "^[Dd][Ee][Bb][Uu][Gg]$")
+string(TOUPPER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_UPPER)
+message(STATUS "Configuring version.hpp with build type: ${CMAKE_BUILD_TYPE_UPPER}")
+
+if(CMAKE_BUILD_TYPE_UPPER STREQUAL "DEBUG")
+    message(STATUS "-> Debug mode detected. GEN_TAU_DEBUG = 1")
     set(GEN_TAU_DEBUG 1)
 else()
+    message(STATUS "-> Release/Other mode. GEN_TAU_DEBUG = 0")
     set(GEN_TAU_DEBUG 0)
 endif()
 

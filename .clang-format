@@ -1,66 +1,73 @@
 ---
 BasedOnStyle: Google
-Language: Cpp
-AccessModifierOffset: '-2'
-AlignAfterOpenBracket: BlockIndent
+AccessModifierOffset: "-2"
 AlignArrayOfStructures: Right
-AlignConsecutiveMacros: AcrossComments
-AlignConsecutiveAssignments: AcrossComments
-AlignConsecutiveDeclarations: Consecutive
-AlignEscapedNewlines: Left
-AlignTrailingComments: true
-AlignOperands: Align
-AllowAllConstructorInitializersOnNextLine: 'false'
-AllowAllParametersOfDeclarationOnNextLine: 'true'
-AllowShortBlocksOnASingleLine: 'true'
+AlignAfterOpenBracket: BlockIndent
+AlignConsecutiveAssignments:
+  Enabled: true
+  AcrossComments: true
+  AlignCompound: true
+  AlignFunctionDeclarations: true
+AlignConsecutiveBitFields:
+  Enabled: true
+  AcrossComments: true
+  PadOperators: true
+AlignConsecutiveDeclarations:
+  Enabled: true
+  PadOperators: true
+AlignConsecutiveMacros:
+  Enabled: true
+  AcrossComments: true
+  PadOperators: true
+AlignConsecutiveShortCaseStatements:
+  Enabled: true
+  AlignCaseArrows: true
+  AlignCaseColons: true
+AlignEscapedNewlines: LeftWithLastLine
+AllowAllParametersOfDeclarationOnNextLine: "true"
+AllowShortBlocksOnASingleLine: "true"
 AllowShortFunctionsOnASingleLine: Inline
 AllowShortLambdasOnASingleLine: Inline
-BreakBeforeBraces: Custom
+BinPackArguments: false
+BinPackParameters: false
 BraceWrapping:
+  AfterCaseLabel: false
   AfterClass: true
+  AfterControlStatement: Never
   AfterEnum: true
   AfterFunction: true
+  AfterNamespace: false
+  AfterObjCDeclaration: false
   AfterStruct: true
   AfterUnion: true
   AfterExternBlock: true
+  BeforeCatch: false
+  BeforeElse: false
+  BeforeLambdaBody: false
+  BeforeWhile: false
+  IndentBraces: false
   SplitEmptyFunction: false
   SplitEmptyRecord: false
   SplitEmptyNamespace: false
-  IndentBraces: false
-  BeforeWhile: false
-  BeforeLambdaBody: false
-  BeforeElse: false
-  BeforeCatch: false
-  AfterNamespace: false
-  AfterObjCDeclaration: false
-  AfterCaseLabel: false
-  AfterControlStatement: Never
-BinPackParameters: true
+BreakBeforeBraces: Custom
 BreakConstructorInitializers: AfterColon
-BreakBeforeTernaryOperators: true
-CompactNamespaces: 'false'
-Cpp11BracedListStyle: 'false'
-FixNamespaceComments: true
-IndentWidth: '4'
+ColumnLimit: 100
+CompactNamespaces: "false"
+Cpp11BracedListStyle: "false"
 IncludeBlocks: Preserve
+IndentWidth: "4"
 ReflowComments: false
-SpaceAfterLogicalNot: 'false'
-SpaceAfterTemplateKeyword: 'false'
-SpaceBeforeAssignmentOperators: 'true'
-SpaceBeforeCpp11BracedList: 'false'
+SpaceAfterLogicalNot: "false"
+SpaceAfterTemplateKeyword: "false"
+SpaceBeforeAssignmentOperators: "true"
+SpaceBeforeCpp11BracedList: "false"
 SpaceBeforeParens: Custom
-SpaceBeforeParensOptions:
-  AfterControlStatements: true
-  AfterForeachMacros: true
-  AfterFunctionDeclarationName: false
-  AfterFunctionDefinitionName: false
-  AfterIfMacros: true
-  AfterOverloadedOperator: false
-  BeforeNonEmptyParentheses: false
-SpaceBeforeRangeBasedForLoopColon: 'true'
-SpaceInEmptyParentheses: 'false'
-SpacesInAngles: 'false'
-TabWidth: '4'
+SpaceBeforeRangeBasedForLoopColon: "true"
+SpacesInAngles: "false"
+TabWidth: "4"
 UseTab: ForContinuationAndIndentation
+Language: Cpp
+AllowAllConstructorInitializersOnNextLine: "false"
+SpaceInEmptyParentheses: "false"
 
-# For 14.0.0 
+# For 20.1.8

@@ -14,7 +14,13 @@ target_include_directories(
 
 target_link_libraries(
     ${VID_RENDER_LIB} PRIVATE
-    PkgConfig::GST Gentau::Conf
+    Gentau::Conf
+    Gentau::TypeRedef
+
+    # Third-party libraries
+    PkgConfig::GST 
+    readerwriterqueue
+    spdlog::spdlog
 )
 
 # Make it safe to be linked into shared libraries 

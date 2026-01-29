@@ -19,21 +19,21 @@ while [[ "$#" -gt 0 ]]; do
         -j|--jobs)      JOBS="$2";       shift ;;
 
         -b|--build)            DO_BUILD=1 ;;       
-        -C|--clean-build)      DO_CLEAN=1 ;;
+        -C|--clean-rebuild)      DO_CLEAN=1 ;;
         
         -h|--help)      
             echo "Usage: $0 [options]"
             echo ""
             echo "Configuration Options:"
-            echo "  -s, --src-dir DIR      Set source directory (default: .)"
-            echo "  -b, --build-dir DIR    Set build directory (default: build)"
-            echo "  -g, --generator NAME   Set CMake generator (default: Ninja)"
+            echo "  -S, --src-dir DIR      Set source directory (default: .)"
+            echo "  -B, --build-dir DIR    Set build directory (default: build)"
+            echo "  -G, --generator NAME   Set CMake generator (default: Ninja)"
             echo "  -t, --type TYPE        Set build type (default: Debug)"
             echo ""
             echo "Build Actions:"
             echo "  -b, --build            Run compilation after configuration"
             echo "  -j, --jobs N           Specifies the number of jobs to run simultaneously"
-            echo "  -C, --clean-build      Remove build directory before configure"
+            echo "  -C, --clean-rebuild    Remove build directory before configure"
             echo ""
             echo "General:"
             echo "  -h, --help             Show this help message"
@@ -63,7 +63,7 @@ if [[ -n "$JOBS" ]]; then
 fi
 echo "========================================"
 
-cmake -S "$SRC_DIR" -G "$GENERATOR" -DCMAKE_BUILD_TYPE="$BUILD_DIR" -B "$BUILD_DIR"
+cmake -S "$SRC_DIR" -G "$GENERATOR" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -B "$BUILD_DIR"
 
 if [ $? -ne 0 ]; then
     echo "Error: CMake Configuration failed."
