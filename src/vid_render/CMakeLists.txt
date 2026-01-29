@@ -1,5 +1,3 @@
-set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR}/lib)
-
 set(VID_RENDER_LIB gt-vid-render)
 
 add_library(
@@ -16,11 +14,11 @@ target_link_libraries(
     ${VID_RENDER_LIB} PRIVATE
     Gentau::Conf
     Gentau::TypeRedef
+    Gentau::Log
 
     # Third-party libraries
     PkgConfig::GST 
     readerwriterqueue
-    spdlog::spdlog
 )
 
 # Make it safe to be linked into shared libraries 
