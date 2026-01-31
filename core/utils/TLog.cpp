@@ -57,6 +57,8 @@ static LoggerPtr createAsyncLogger(const string& logger_name)
 
 	logger->set_level(static_cast<spd::level::level_enum>(SPDLOG_ACTIVE_LEVEL));
 
+	logger->flush_on(spd::level::err);
+
 	spd::register_logger(logger);
 	return logger;
 }
