@@ -5,28 +5,34 @@ configure_file(
     NEWLINE_STYLE UNIX
 )
 
-set(CONF_LIB ${GT_LIB_PREFIX}conf CACHE INTERNAL "Configuration Library")
-set(CONF_LIB_ALIAS ${GT_EXPORT_LIB_NS}Conf)
-
-add_library(
-    ${CONF_LIB} INTERFACE
+gt_register_mod(
+    NAME conf
+    TYPE INTERFACE 
+    GEN_ANCHOR
 )
 
-target_include_directories(
-    ${CONF_LIB} INTERFACE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
-)
+# set(CONF_LIB ${GT_LIB_PREFIX}conf CACHE INTERNAL "Configuration Library")
+# set(CONF_LIB_ALIAS ${GT_EXPORT_LIB_NS}Conf)
 
-add_library(${CONF_LIB_ALIAS} ALIAS ${CONF_LIB})
+# add_library(
+#     ${CONF_LIB} INTERFACE
+# )
 
-# ---------------- Clangd anchor target ----------------
-add_library(
-    gt_conf_clangd_anchor STATIC EXCLUDE_FROM_ALL
-    clangd-anchor.cpp
-)
+# target_include_directories(
+#     ${CONF_LIB} INTERFACE
+#     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
+# )
 
-target_link_libraries(
-    gt_conf_clangd_anchor
-    PRIVATE ${CONF_LIB}
-)
-# ------------------- DO NOT REMOVE ---------------------
+# add_library(${CONF_LIB_ALIAS} ALIAS ${CONF_LIB})
+
+# # ---------------- Clangd anchor target ----------------
+# add_library(
+#     gt_conf_clangd_anchor STATIC EXCLUDE_FROM_ALL
+#     clangd-anchor.cpp
+# )
+
+# target_link_libraries(
+#     gt_conf_clangd_anchor
+#     PRIVATE ${CONF_LIB}
+# )
+# # ------------------- DO NOT REMOVE ---------------------

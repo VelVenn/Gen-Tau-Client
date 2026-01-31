@@ -10,7 +10,7 @@ include(FetchContent)
 FetchContent_Declare(
   readerwriterqueue
   GIT_REPOSITORY https://github.com/cameron314/readerwriterqueue
-  GIT_TAG master
+  GIT_TAG master # Using released version may trigger CMake deprecation warning (< 3.10)
 )
 FetchContent_MakeAvailable(readerwriterqueue)
 

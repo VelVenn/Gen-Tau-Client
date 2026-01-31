@@ -1,9 +1,9 @@
-set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/bin)
-set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR}/lib)
+# set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/bin)
+# set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR}/lib)
 
-add_subdirectory(conf)
-add_subdirectory(utils)
-add_subdirectory(vid_render)
+# add_subdirectory(conf)
+# add_subdirectory(utils)
+# add_subdirectory(vid_render)
 
 qt_add_executable(${GT_APP_NAME}
     main.cpp
@@ -11,9 +11,9 @@ qt_add_executable(${GT_APP_NAME}
 
 qt_add_qml_module(${GT_APP_NAME}
     URI Gentau.UI
-    VERSION ${QML_MODULE_VERSION_MAJOR}.${QML_MODULE_VERSION_MINOR}
+    VERSION ${GT_QML_MOD_VERSION_MAJOR}.${GT_QML_MOD_VERSION_MINOR}
     QML_FILES
-        app/qml/Main.qml
+        qml/Main.qml
 )
 
 message("Building ${GT_APP_NAME} version ${PROJECT_VERSION}")

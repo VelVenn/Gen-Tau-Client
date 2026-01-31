@@ -1,9 +1,10 @@
-#! /bin/bash
+#! /bin/zsh
 
 SRC_DIR=.
 BUILD_DIR="build"
 GENERATOR="Ninja"
 BUILD_TYPE="Debug"
+VERBOSE=0
 
 DO_BUILD=0
 JOBS=""
@@ -65,7 +66,7 @@ if [[ -n "$JOBS" ]]; then
 fi
 echo "========================================"
 
-cmake -S "$SRC_DIR" -G "$GENERATOR" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -B "$BUILD_DIR"
+cmake -S "$SRC_DIR" -G "$GENERATOR" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -B "$BUILD_DIR" -DGEN_TAU_CMAKE_VERBOSE="$VERBOSE"
 
 if [ $? -ne 0 ]; then
     echo "Error: CMake Configuration failed."
