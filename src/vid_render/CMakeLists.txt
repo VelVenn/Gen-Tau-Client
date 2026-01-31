@@ -1,4 +1,5 @@
-set(VID_RENDER_LIB gt-vid-render)
+set(VID_RENDER_LIB ${GT_LIB_PREFIX}vid-render CACHE INTERNAL "Video Rendering Library")
+set(VID_RENDER_LIB_ALIAS ${GT_EXPORT_LIB_NS}VidRender)
 
 add_library(
     ${VID_RENDER_LIB} STATIC
@@ -12,9 +13,9 @@ target_include_directories(
 
 target_link_libraries(
     ${VID_RENDER_LIB} PRIVATE
-    Gentau::Conf
-    Gentau::TypeRedef
-    Gentau::Log
+    ${CONF_LIB}
+    ${TYPE_REDEF_LIB}
+    ${LOG_LIB}
 
     # Third-party libraries
     PkgConfig::GST 
@@ -24,4 +25,4 @@ target_link_libraries(
 # Make it safe to be linked into shared libraries 
 set_target_properties(${VID_RENDER_LIB} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-add_library(${GEN_TAU_LIB_NAMESPACE}VidRender ALIAS ${VID_RENDER_LIB})
+add_library(${VID_RENDER_LIB_ALIAS} ALIAS ${VID_RENDER_LIB})

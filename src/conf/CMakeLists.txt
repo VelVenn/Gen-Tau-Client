@@ -1,14 +1,3 @@
-string(TOUPPER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_UPPER)
-message(STATUS "Configuring version.hpp with build type: ${CMAKE_BUILD_TYPE_UPPER}")
-
-if(CMAKE_BUILD_TYPE_UPPER STREQUAL "DEBUG")
-    message(STATUS "-> Debug mode detected. GEN_TAU_DEBUG = 1")
-    set(GEN_TAU_DEBUG 1)
-else()
-    message(STATUS "-> Release/Other mode. GEN_TAU_DEBUG = 0")
-    set(GEN_TAU_DEBUG 0)
-endif()
-
 configure_file(
     version.hpp.in
     "${CMAKE_CURRENT_SOURCE_DIR}/inc/conf/version.hpp"
@@ -16,7 +5,8 @@ configure_file(
     NEWLINE_STYLE UNIX
 )
 
-set(CONF_LIB gt-conf)
+set(CONF_LIB ${GT_LIB_PREFIX}conf CACHE INTERNAL "Configuration Library")
+set(CONF_LIB_ALIAS ${GT_EXPORT_LIB_NS}Conf)
 
 add_library(
     ${CONF_LIB} INTERFACE
@@ -27,7 +17,7 @@ target_include_directories(
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
 )
 
-add_library(${GEN_TAU_LIB_NAMESPACE}Conf ALIAS ${CONF_LIB})
+add_library(${CONF_LIB_ALIAS} ALIAS ${CONF_LIB})
 
 # ---------------- Clangd anchor target ----------------
 add_library(

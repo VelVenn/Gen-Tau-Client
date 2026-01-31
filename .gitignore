@@ -72,6 +72,8 @@ CMakeLists.txt.user*
 # --------
 *.dll
 *.exe
+*.so 
+*.dylib
 
 # Directories with generated files
 .moc/
@@ -81,10 +83,19 @@ CMakeLists.txt.user*
 .uic/
 /build*/
 
-# Customize
+# Environment files
 *compile_commands.json
 *.env
+
+*logs/
+*.log
+
+# Clangd specific ignores
 *.clangd
+
+# Generated version files
+*version.hpp
+*version.h
 
 # IDE specific ignores
 .vscode/
@@ -96,6 +107,8 @@ CMakeLists.txt.user*
 
 # Build output
 build*/
+qc_build/
 bin/
 
+# Temporary files
 *tmp*.txt
