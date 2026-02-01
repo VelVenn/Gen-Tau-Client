@@ -3,7 +3,6 @@
 #include "utils/TTypeRedef.hpp"
 
 #include <gst/gst.h>
-#include <gst/gstelement.h>
 
 #include "readerwritercircularbuffer.h"
 
@@ -28,6 +27,7 @@ class TVidRender
 	GstElement* pipeline;
 	GstElement* src;
 	GstElement* parser;
+	GstElement* queue;
 	GstElement* decoder;
 	GstElement* vconv;
 	GstElement* conv;
@@ -45,7 +45,7 @@ class TVidRender
 	std::jthread busThread;
 
   private:
-	void onDecoderPadAdded();
+	static void onDecoderPadAdded(GstElement* decoder, GstPad* new_pad, gpointer user_data);
 
   private:
 	bool initPipeElements();
