@@ -1,3 +1,5 @@
+include_guard(GLOBAL)
+
 find_package(Qt6 6.8 REQUIRED COMPONENTS Quick)
 find_package(PkgConfig REQUIRED)
 

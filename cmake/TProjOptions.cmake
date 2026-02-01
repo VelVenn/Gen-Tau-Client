@@ -1,3 +1,4 @@
+include_guard(GLOBAL)
 
 # =========================== GEN_TAU LOGGING OPTIONS ============================
 option(GEN_TAU_LOG_ENABLED "Enable Gen-τ logging" ON)

@@ -1,3 +1,5 @@
+include_guard(GLOBAL)
+
 function(gt_extra_link_info)
   message(STATUS "")
   message(STATUS "========================================")

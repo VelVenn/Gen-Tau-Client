@@ -1,3 +1,5 @@
+include_guard(GLOBAL)
+
 # =========================== GEN_TAU GENERAL SETTINGS ===========================
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 

@@ -1,2 +1,3 @@
 add_subdirectory(render)
 add_subdirectory(log_test)
+add_subdirectory(cmake_mod_test)

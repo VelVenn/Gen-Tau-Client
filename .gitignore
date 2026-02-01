@@ -87,6 +87,11 @@ CMakeLists.txt.user*
 *compile_commands.json
 *.env
 
+*tmp*.cpp
+*tmp*.h
+*tmp*.hpp
+*tmp*.txt
+
 *logs/
 *.log
 

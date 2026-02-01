@@ -1,7 +1,8 @@
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.25)
 
 project(gen_tau_client VERSION 0.1.0 LANGUAGES CXX)
 
+# ============================ GEN_TAU CMAKE MODULES =============================
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 include(TProjOptions)
@@ -12,6 +13,8 @@ include(TExtraInfo)
 
 set_property(GLOBAL PROPERTY GEN_TAU_MODULES "")
 set_property(GLOBAL PROPERTY GEN_TAU_TESTS "")
+set_property(GLOBAL PROPERTY GEN_TAU_MODULE_ALIAS "")
+# ============================ GEN_TAU CMAKE MODULES =============================
 
 add_subdirectory(core)
 add_subdirectory(app)
