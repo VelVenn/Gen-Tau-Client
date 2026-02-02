@@ -6,6 +6,7 @@
 
 #include <gst/gst.h>
 
+#include <gst/gstelementfactory.h>
 #include <memory>
 #include <string>
 
@@ -71,7 +72,11 @@ typedef class _GstPipeData : public enable_shared_from_this<_GstPipeData>
 		// else
 		//     decoder = gst_element_factory_make("decodebin", "auto_det_decoder");
 
+		#if __APPLE__
+		decoder = gst_element_factory_make("vtdec", "decoder");
+		#else
 		decoder = gst_element_factory_make("nvh265dec", "decoder");
+		#endif
 
 		vconv = gst_element_factory_make("videoconvert", "videoconvert");
 
@@ -193,7 +198,7 @@ int main(int argc, char* argv[])
 		//     });
 
 		app.exec();  // pipe must destruct before the app or will cause segfault
-					 // e.i. the pipe should be constructed after app
+					 // i.e. the pipe should be constructed after app
 	}
 
 	gst_deinit();
