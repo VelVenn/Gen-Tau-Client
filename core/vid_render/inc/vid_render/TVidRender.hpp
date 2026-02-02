@@ -6,6 +6,8 @@
 
 #include "readerwritercircularbuffer.h"
 
+#include "sigslot/signal.hpp"
+
 #include <atomic>
 #include <chrono>
 #include <memory>

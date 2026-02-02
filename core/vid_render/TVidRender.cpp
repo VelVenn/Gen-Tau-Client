@@ -2,12 +2,12 @@
 
 #include "conf/version.hpp"
 
+#include "utils/TLogical.hpp"
 #include "utils/TDeduction.hpp"
 #include "utils/TLog.hpp"
 
-#include <glibconfig.h>
-#include <gst/gstquery.h>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 
 #define T_LOG_TAG_IMG       ">>Video Render<< "
@@ -21,6 +21,32 @@ constexpr gint64 MAX_RENDER_DELAY = -1;
 #else
 constexpr auto MAX_RENDER_DELAY = 20 * GST_MSECOND;
 #endif
+
+// Refcounting of Gstreamer objects
+// Original: https://gstreamer.freedesktop.org/documentation/additional/design/MT-refcounting.html?gi-language=c#refcounting1
+
+// All new objects created have the FLOATING flag set. This means that the object 
+// is not owned or managed yet by anybody other than the one holding a reference 
+// to the object. The object in this state has a reference count of 1.
+
+// Various object methods can take ownership of another object, this means that 
+// after calling a method on object A with an object B as an argument, the object 
+// B is made sole property of object A. This means that after the method call you 
+// are not allowed to access the object anymore unless you keep an extra reference 
+// to the object. An example of such a method is the _bin_add() method. As soon as 
+// this function is called in a Bin, the element passed as an argument is owned by 
+// the bin and you are not allowed to access it anymore without taking a _ref() 
+// before adding it to the bin. The reason being that after the _bin_add() call 
+// disposing the bin also destroys the element.
+
+// Taking ownership of an object happens through the process of "sinking" the object. 
+// The _sink() method on an object will decrease the refcount of the object if the 
+// FLOATING flag is set. The act of taking ownership of an object is then performed 
+// as a _ref() followed by a _sink() call on the object.
+
+// The float/sink process is very useful when initializing elements that will then be 
+// placed under control of a parent. The floating ref keeps the object alive until it 
+// is parented, and once the object is parented you can forget about it.
 
 void TVidRender::onDecoderPadAdded(GstElement* decoder, GstPad* new_pad, gpointer user_data)
 {

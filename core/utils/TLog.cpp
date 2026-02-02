@@ -38,7 +38,7 @@ static vector<spd::sink_ptr> createSinks()
 		s_list.push_back(stdout_sink);
 
 		return s_list;
-	}();  // Return value of lambda immediately.
+	}();  // Return value of lambda to static variable immediately.
 
 	return sinks;
 }
