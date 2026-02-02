@@ -19,7 +19,7 @@ typedef class _GstPipeData : public enable_shared_from_this<_GstPipeData>
 	GstElement* src;
 	GstElement* parser;
 	GstElement* decoder;
-	GstElement* conv;
+	GstElement* mem_upload;
 	GstElement* sink;
 	GstElement* vconv;
 	GstElement* fps_sink;
@@ -78,18 +78,18 @@ typedef class _GstPipeData : public enable_shared_from_this<_GstPipeData>
 		decoder = gst_element_factory_make("nvh265dec", "decoder");
 		#endif
 
-		vconv = gst_element_factory_make("videoconvert", "videoconvert");
+		vconv = gst_element_factory_make("glcolorconvert", "vconv");
 
-		conv = gst_element_factory_make("glupload", "conv");
+		mem_upload = gst_element_factory_make("glupload", "mem_upload");
 		sink = gst_element_factory_make("qml6glsink", "sink");
 		// fps_sink = gst_element_factory_make("fpsdisplaysink", "fps_sink");
 
 		// g_assert(pipeline && src && parser && decoder && conv && sink);
 
 		gst_bin_add_many(
-			GST_BIN(pipeline), src, parser, decoder, vconv, conv, sink, NULL
+			GST_BIN(pipeline), src, parser, decoder, vconv, mem_upload, sink, NULL
 		);
-		gst_element_link_many(src, parser, decoder, vconv, conv, sink, NULL);
+		gst_element_link_many(src, parser, decoder, mem_upload, vconv, sink, NULL);
 
 		g_object_set(sink, "sync", FALSE, NULL);
 		g_object_set(src, "location", file_path.c_str(), NULL);
