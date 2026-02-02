@@ -23,6 +23,13 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(fmt)
 
+FetchContent_Declare(
+  sigslot
+  GIT_REPOSITORY https://github.com/palacaze/sigslot
+  GIT_TAG        v1.2.3
+)
+FetchContent_MakeAvailable(sigslot)
+
 if(GEN_TAU_LOG_ENABLED)
   set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "Use external fmt library" FORCE)
   FetchContent_Declare(

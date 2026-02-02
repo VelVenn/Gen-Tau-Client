@@ -6,5 +6,6 @@ gt_register_mod(
     conf
     utils
     readerwriterqueue
+    Pal::Sigslot 
     PkgConfig::GST
 )
