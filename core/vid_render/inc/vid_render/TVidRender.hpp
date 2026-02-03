@@ -17,7 +17,7 @@
 class QQuickItem;
 
 namespace gentau {
-class TVidRender
+class TVidRender : public std::enable_shared_from_this<TVidRender>
 {
   public:
 	using FramePtr  = std::unique_ptr<std::vector<u8>>;
@@ -29,10 +29,11 @@ class TVidRender
 	GstElement* pipeline;
 	GstElement* src;
 	GstElement* parser;
-	GstElement* queue;
+	GstElement* bufferQueue;
 	GstElement* decoder;
-	GstElement* vconv;
-	GstElement* conv;
+	GstElement* leakyQueue;
+	GstElement* colorConv;
+	GstElement* uploader;
 	GstElement* sink;
 
 	Buffer naluBuffer;

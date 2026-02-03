@@ -87,6 +87,7 @@ CMakeLists.txt.user*
 *compile_commands.json
 *.env
 
+# Temporary files
 *tmp*.cpp
 *tmp*.h
 *tmp*.hpp
@@ -114,6 +115,4 @@ CMakeLists.txt.user*
 build*/
 qc_build/
 bin/
-
-# Temporary files
-*tmp*.txt
+out/

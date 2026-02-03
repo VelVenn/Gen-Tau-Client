@@ -22,7 +22,7 @@ gt_register_test(
   QML_URI Render
   QML_FILES qml/RendTest.qml
   DEPS
-    PRIVATE
-      Qt6::Quick
-      PkgConfig::GST
+    vid-render
+    Qt6::Quick
+    PkgConfig::GST
 )

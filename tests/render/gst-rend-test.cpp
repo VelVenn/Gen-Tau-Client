@@ -1,3 +1,5 @@
+#include "vid_render/TVidRender.hpp"
+
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickItem>
@@ -11,6 +13,21 @@
 #include <string>
 
 using namespace std;
+
+#define RENDER_GT 1
+#define RENDER_GP 2
+
+#define CUR_RENDER_T 1
+
+#if CUR_RENDER_T == RENDER_GP
+#define RENDER_T  _GstPipeData
+#define LINK(...) sink_widget_link(__VA_ARGS__)
+#elif CUR_RENDER_T == RENDER_GT
+#define RENDER_T  gentau::TVidRender
+#define LINK(...) linkWidget(__VA_ARGS__)
+#else
+#define LINK(...) static_assert(false, "Unsupported RENDER_T type.")
+#endif
 
 typedef class _GstPipeData : public enable_shared_from_this<_GstPipeData>
 {
@@ -31,29 +48,23 @@ typedef class _GstPipeData : public enable_shared_from_this<_GstPipeData>
   public:
 	bool play()
 	{
-		GstStateChangeReturn ret =
-			gst_element_set_state(pipeline, GST_STATE_PLAYING);
+		GstStateChangeReturn ret = gst_element_set_state(pipeline, GST_STATE_PLAYING);
 		return ret != GST_STATE_CHANGE_FAILURE;
 	}
 
 	bool pause()
 	{
-		GstStateChangeReturn ret =
-			gst_element_set_state(pipeline, GST_STATE_PAUSED);
+		GstStateChangeReturn ret = gst_element_set_state(pipeline, GST_STATE_PAUSED);
 		return ret != GST_STATE_CHANGE_FAILURE;
 	}
 
 	bool stop()
 	{
-		GstStateChangeReturn ret =
-			gst_element_set_state(pipeline, GST_STATE_NULL);
+		GstStateChangeReturn ret = gst_element_set_state(pipeline, GST_STATE_NULL);
 		return ret != GST_STATE_CHANGE_FAILURE;
 	}
 
-	void sink_widget_link(QQuickItem* item)
-	{
-		g_object_set(sink, "widget", item, NULL);
-	}
+	void sink_widget_link(QQuickItem* item) { g_object_set(sink, "widget", item, NULL); }
 
 	_GstPipeData(const string& file_path)
 	{
@@ -72,24 +83,22 @@ typedef class _GstPipeData : public enable_shared_from_this<_GstPipeData>
 		// else
 		//     decoder = gst_element_factory_make("decodebin", "auto_det_decoder");
 
-		#if __APPLE__
+#if __APPLE__
 		decoder = gst_element_factory_make("vtdec", "decoder");
-		#else
+#else
 		decoder = gst_element_factory_make("nvh265dec", "decoder");
-		#endif
+#endif
 
 		vconv = gst_element_factory_make("glcolorconvert", "vconv");
 
 		mem_upload = gst_element_factory_make("glupload", "mem_upload");
-		sink = gst_element_factory_make("qml6glsink", "sink");
+		sink       = gst_element_factory_make("qml6glsink", "sink");
 		// fps_sink = gst_element_factory_make("fpsdisplaysink", "fps_sink");
 
 		// g_assert(pipeline && src && parser && decoder && conv && sink);
 
-		gst_bin_add_many(
-			GST_BIN(pipeline), src, parser, decoder, vconv, mem_upload, sink, NULL
-		);
-		gst_element_link_many(src, parser, decoder, mem_upload, vconv, sink, NULL);
+		gst_bin_add_many(GST_BIN(pipeline), src, parser, decoder, vconv, mem_upload, sink, NULL);
+		gst_element_link_many(src, parser, decoder, mem_upload, sink, NULL);
 
 		g_object_set(sink, "sync", FALSE, NULL);
 		g_object_set(src, "location", file_path.c_str(), NULL);
@@ -138,44 +147,51 @@ typedef class _GstPipeData : public enable_shared_from_this<_GstPipeData>
 class RunningTask : public QRunnable
 {
   public:
-	RunningTask(shared_ptr<GstPipe> pipe_data) : m_pipe_data(pipe_data) {}
+	RunningTask(shared_ptr<RENDER_T> pipe_data) : m_pipe_data(pipe_data) {}
 	~RunningTask() override = default;
 
 	void run() override { m_pipe_data->play(); }
 
   private:
-	shared_ptr<GstPipe> m_pipe_data;
+	shared_ptr<RENDER_T> m_pipe_data;
 };
 
 int main(int argc, char* argv[])
 {
-	// qputenv("QT_QPA_PLATFORM", "xcb");
-	qputenv("QSG_RENDER_TIMING", "1");
-	qputenv("__GL_SYNC_TO_VBLANK", "0");
+	// qputenv("QT_QPA_PLATFORM", "xcb");                                // 强制QT使用X11合成器
+	qputenv("QSG_RENDER_TIMING", "1");                    // 启用渲染时间测量
+	qputenv("QSG_RENDER_LOOP", "basic");                  // 强制基础渲染循环
+	qputenv("__GL_SYNC_TO_VBLANK", "0");                  // 禁用NVIDIA VSync
+	qputenv("vblank_mode", "0");                          // 禁用Mesa VSync
+	qputenv("_NET_WM_BYPASS_COMPOSITOR", "1");            // 绕过X11合成器以减少延迟
+	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");  // 禁用Wayland窗口装饰以减少延迟
 
 	gst_init(&argc, &argv);
 
 	{
+		QSurfaceFormat format = QSurfaceFormat::defaultFormat();
+		format.setSwapInterval(0);  // 禁用 OpenGL 交换间隔
+		QSurfaceFormat::setDefaultFormat(format);
+
 		QGuiApplication app(argc, argv);
 		QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
 
-		shared_ptr<GstPipe> pipe =
-			make_shared<GstPipe>("./res/raw_sintel_1080p_stream.h265");
+		shared_ptr<RENDER_T> pipe = make_shared<RENDER_T>("./res/raw_sintel_1080p_stream.h265");
 
 		QQmlApplicationEngine engine;
 		QObject::connect(
-			&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
-			[]() { QCoreApplication::exit(-1); }, Qt::QueuedConnection
+			&engine,
+			&QQmlApplicationEngine::objectCreationFailed,
+			&app,
+			[]() { QCoreApplication::exit(-1); },
+			Qt::QueuedConnection
 		);
 		engine.loadFromModule("Gentau.Test.Render", "RendTest");
 
 		// 检查根对象
-		if (engine.rootObjects().isEmpty()) {
-			qFatal("QML load failed (Root Objects empty).");
-		}
+		if (engine.rootObjects().isEmpty()) { qFatal("QML load failed (Root Objects empty)."); }
 
-		QQuickWindow* rootObject =
-			static_cast<QQuickWindow*>(engine.rootObjects().first());
+		QQuickWindow* rootObject = static_cast<QQuickWindow*>(engine.rootObjects().first());
 
 		// 关键调试：打印一下，看看到底有没有找到
 		QQuickItem* videoItem = rootObject->findChild<QQuickItem*>("videoItem");
@@ -185,7 +201,7 @@ int main(int argc, char* argv[])
 			qDebug() << "SUCCESS: Found videoItem:" << videoItem;
 		}
 
-		pipe->sink_widget_link(videoItem);
+		pipe->LINK(videoItem);
 		rootObject->scheduleRenderJob(
 			new RunningTask(pipe), QQuickWindow::BeforeSynchronizingStage
 		);
