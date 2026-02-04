@@ -1,6 +1,4 @@
 #include "vid_render/TVidRender.hpp"
-#include <glib-object.h>
-#include <gst/gstcaps.h>
 
 #include "conf/version.hpp"
 
@@ -8,11 +6,12 @@
 #include "utils/TLog.hpp"
 #include "utils/TLogical.hpp"
 
+#include <gst/gstutils.h>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 
-#define T_LOG_TAG_IMG       ">>Video Render<< "
+#define T_LOG_TAG_IMG       "[Video Render] "
 #define RENDER_WAIT_FOREVER (0 && GEN_TAU_DEBUG)
 
 using namespace std;
@@ -102,10 +101,22 @@ TVidRender::TVidRender(const char* file_path) : naluBuffer(0)
 		leakyQueue  = gst_element_factory_make("queue", "leakyQueue");
 		colorConv   = gst_element_factory_make("glcolorconvert", "colorConv");
 		uploader    = gst_element_factory_make("glupload", "uploader");
-		sink        = gst_element_factory_make("qml6glsink", "sink");
+		// for (auto& overlay : overlays) {
+		// 	overlay = gst_element_factory_make("qml6gloverlay", nullptr);
+		// }
+		sink = gst_element_factory_make("qml6glsink", "sink");
 
 		if (anyFalse(
-				pipeline, src, parser, decoder, bufferQueue, leakyQueue, uploader, colorConv, sink
+				pipeline,
+				src,
+				parser,
+				decoder,
+				bufferQueue,
+				leakyQueue,
+				uploader,
+				colorConv,
+				// overlays,
+				sink
 			)) {
 			constexpr auto errMsg = "Failed to create all Gstreamer elements."sv;
 			tImgTransLogCritical("{}", errMsg);
@@ -124,10 +135,24 @@ TVidRender::TVidRender(const char* file_path) : naluBuffer(0)
 			sink,
 			nullptr
 		);
+		// for (auto overlay : overlays) { gst_bin_add(GST_BIN(pipeline), overlay); }
+
+		// auto linkOverlays = [&]() {
+		// 	auto curSrcElement = colorConv;
+		// 	for (auto overlay : overlays) {
+		// 		if (!gst_element_link(curSrcElement, overlay)) { return false; }
+		// 		curSrcElement = overlay;
+		// 	}
+
+		// 	if (!gst_element_link(curSrcElement, sink)) { return false; }
+
+		// 	return true;
+		// };
 
 		if (anyFalse(
 				gst_element_link_many(leakyQueue, uploader, colorConv, sink, nullptr),
 				gst_element_link_many(src, parser, bufferQueue, decoder, nullptr)
+				// linkOverlays()
 			)) {
 			constexpr auto errMsg =
 				"Failed to link GStreamer elements."sv;  // string_view 在编译期被构造和分配空间
@@ -140,19 +165,26 @@ TVidRender::TVidRender(const char* file_path) : naluBuffer(0)
 		g_object_set(sink, "sync", FALSE, "max-lateness", MAX_RENDER_DELAY, nullptr);
 		g_object_set(src, "location", file_path, nullptr);
 		g_object_set(parser, "config-interval", -1, nullptr);
-		g_object_set(bufferQueue, "max-size-buffers", 20, "leaky", 0, nullptr);
+		g_object_set(bufferQueue, "max-size-buffers", 2, "leaky", 0, nullptr);
 		g_object_set(
 			leakyQueue,
 			"max-size-buffers",
 			2,
 			"max-size-bytes",
-			0,
+			0,  // Disabled
 			"max-size-time",
-			0,
+			0,  // Disabled
 			"leaky",
-			2,
+			2,  // downstream
 			nullptr
 		);
+
+		if constexpr (conf::TDebugMode) {
+			g_object_set(sink, "widget", nullptr, nullptr);
+			void* res;
+			g_object_get(G_OBJECT(sink), "widget", &res, nullptr);
+			tImgTransLogDebug("qml6glsink widget init to null? -> {}", res == nullptr);
+		}
 
 		g_signal_connect(decoder, "pad-added", G_CALLBACK(onDecoderPadAdded), this);
 
@@ -184,8 +216,26 @@ bool TVidRender::play()
 	return true;
 }
 
-void TVidRender::linkWidget(QQuickItem* widget)
+void TVidRender::linkSinkWidget(QQuickItem* widget)
 {
 	g_object_set(sink, "widget", widget, nullptr);
 }
+
+// bool TVidRender::linkOverlayWidget(u64 idx, QQuickItem* widget)
+// {
+// 	if (idx >= overlays.size()) {
+// 		tImgTransLogWarn("Overlay index {} out of bounds.", idx);
+// 		return false;
+// 	}
+
+// 	g_object_set(overlays[idx], "widget", widget, nullptr);
+// 	return true;
+// }
+
+// void TVidRender::linkOverlayRoot(QQuickItem* root)
+// {
+// 	for (auto overlay : overlays) {
+// 		g_object_set(overlay, "root", &root, nullptr);
+// 	}
+// }
 }  // namespace gentau

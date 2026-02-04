@@ -24,7 +24,7 @@ using namespace std;
 #define LINK(...) sink_widget_link(__VA_ARGS__)
 #elif CUR_RENDER_T == RENDER_GT
 #define RENDER_T  gentau::TVidRender
-#define LINK(...) linkWidget(__VA_ARGS__)
+#define LINK(...) linkSinkWidget(__VA_ARGS__)
 #else
 #define LINK(...) static_assert(false, "Unsupported RENDER_T type.")
 #endif
@@ -202,6 +202,8 @@ int main(int argc, char* argv[])
 		}
 
 		pipe->LINK(videoItem);
+		// pipe->linkOverlayWidget(0, videoItem);
+		// pipe->linkOverlayWidget(1, videoItem);
 		rootObject->scheduleRenderJob(
 			new RunningTask(pipe), QQuickWindow::BeforeSynchronizingStage
 		);

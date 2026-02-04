@@ -32,6 +32,7 @@ Window {
                 text: "GStreamer Rendering"
                 color: "green"
                 font.pixelSize: 24
+                font.family: "Fira Code"
                 anchors.top: parent.top
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.topMargin: 40

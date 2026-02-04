@@ -8,6 +8,7 @@
 
 #include "sigslot/signal.hpp"
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <memory>
@@ -34,6 +35,7 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	GstElement* leakyQueue;
 	GstElement* colorConv;
 	GstElement* uploader;
+	// std::array<GstElement*, 2> overlays;
 	GstElement* sink;
 
 	Buffer naluBuffer;
@@ -68,7 +70,11 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	bool stop();
 
   public:
-	void linkWidget(QQuickItem* widget);
+	void linkSinkWidget(QQuickItem* widget);
+	// bool linkOverlayWidget(u64 idx, QQuickItem* widget);
+	// void linkOverlayRoot(QQuickItem* root);
+
+	// TODO: Add sink probe to get rendered frames' timestamp
 
   public:
 	TVidRender();
