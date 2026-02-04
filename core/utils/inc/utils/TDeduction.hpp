@@ -19,11 +19,11 @@ constexpr auto overload(Ret (*ptr)(VTypes...))
 	return ptr;
 }
 
-#define LiftDefaultParams(func)                               \
-	[=](auto&&... args) noexcept(                             \
-		noexcept(func(std::forward<decltype(args)>(args)...)) \
-	) -> decltype(auto) {                                     \
-		return func(std::forward<decltype(args)>(args)...);   \
+#define liftDefaultParams(func)                                                                    \
+	[=](auto&&... args) noexcept(                                                                  \
+		noexcept(func(std::forward<decltype(args)>(args)...))                                      \
+	) -> decltype(auto) {                                                                          \
+		return func(std::forward<decltype(args)>(args)...);                                        \
 	}
 
 }  // namespace gentau

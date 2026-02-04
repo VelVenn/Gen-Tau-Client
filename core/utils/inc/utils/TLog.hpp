@@ -22,30 +22,30 @@ LoggerPtr getProtoLogger();
 	SPDLOG_LOGGER_TRACE(gentau::getImgTransLogger(), T_LOG_TAG_IMG fmt __VA_OPT__(, ) __VA_ARGS__)
 #define tImgTransLogDebug(fmt, ...)                                                                \
 	SPDLOG_LOGGER_DEBUG(gentau::getImgTransLogger(), T_LOG_TAG_IMG fmt __VA_OPT__(, ) __VA_ARGS__)
-#define tImgTransLogInfo(fmt, ...)                                                                \
+#define tImgTransLogInfo(fmt, ...)                                                                 \
 	SPDLOG_LOGGER_INFO(gentau::getImgTransLogger(), T_LOG_TAG_IMG fmt __VA_OPT__(, ) __VA_ARGS__)
-#define tImgTransLogWarn(fmt, ...)                                                                \
+#define tImgTransLogWarn(fmt, ...)                                                                 \
 	SPDLOG_LOGGER_WARN(gentau::getImgTransLogger(), T_LOG_TAG_IMG fmt __VA_OPT__(, ) __VA_ARGS__)
 #define tImgTransLogError(fmt, ...)                                                                \
 	SPDLOG_LOGGER_ERROR(gentau::getImgTransLogger(), T_LOG_TAG_IMG fmt __VA_OPT__(, ) __VA_ARGS__)
 
-#define tImgTransLogCritical(fmt, ...)                                            \
-	SPDLOG_LOGGER_CRITICAL(                                                       \
-		gentau::getImgTransLogger(), T_LOG_TAG_IMG fmt __VA_OPT__(, ) __VA_ARGS__ \
+#define tImgTransLogCritical(fmt, ...)                                                             \
+	SPDLOG_LOGGER_CRITICAL(                                                                        \
+		gentau::getImgTransLogger(), T_LOG_TAG_IMG fmt __VA_OPT__(, ) __VA_ARGS__                  \
 	)
 
 // Protobuf Module Logging Macros
-#define tProtoLogTrace(fmt, ...)                                                                  \
+#define tProtoLogTrace(fmt, ...)                                                                   \
 	SPDLOG_LOGGER_TRACE(gentau::getProtoLogger(), T_LOG_TAG_PROTO fmt __VA_OPT__(, ) __VA_ARGS__)
-#define tProtoLogDebug(fmt, ...)                                                                  \
+#define tProtoLogDebug(fmt, ...)                                                                   \
 	SPDLOG_LOGGER_DEBUG(gentau::getProtoLogger(), T_LOG_TAG_PROTO fmt __VA_OPT__(, ) __VA_ARGS__)
-#define tProtoLogInfo(fmt, ...)                                                                  \
+#define tProtoLogInfo(fmt, ...)                                                                    \
 	SPDLOG_LOGGER_INFO(gentau::getProtoLogger(), T_LOG_TAG_PROTO fmt __VA_OPT__(, ) __VA_ARGS__)
-#define tProtoLogWarn(fmt, ...)                                                                  \
+#define tProtoLogWarn(fmt, ...)                                                                    \
 	SPDLOG_LOGGER_WARN(gentau::getProtoLogger(), T_LOG_TAG_PROTO fmt __VA_OPT__(, ) __VA_ARGS__)
-#define tProtoLogError(fmt, ...)                                                                  \
+#define tProtoLogError(fmt, ...)                                                                   \
 	SPDLOG_LOGGER_ERROR(gentau::getProtoLogger(), T_LOG_TAG_PROTO fmt __VA_OPT__(, ) __VA_ARGS__)
-#define tProtoLogCritical(fmt, ...) \
+#define tProtoLogCritical(fmt, ...)                                                                \
 	SPDLOG_LOGGER_CRITICAL(gentau::getProtoLogger(), T_LOG_TAG_PROTO fmt __VA_OPT__(, ) __VA_ARGS__)
 
 #else
