@@ -1,6 +1,11 @@
 include_guard(GLOBAL)
 
-find_package(Qt6 6.8 REQUIRED COMPONENTS Quick)
+find_package(Qt6 6.8 REQUIRED COMPONENTS
+  Quick
+  Qml
+  QmlModels
+  QmlWorkerScript
+)
 find_package(PkgConfig REQUIRED)
 
 pkg_check_modules(GST REQUIRED IMPORTED_TARGET gstreamer-1.0)
@@ -26,7 +31,7 @@ FetchContent_MakeAvailable(fmt)
 FetchContent_Declare(
   sigslot
   GIT_REPOSITORY https://github.com/palacaze/sigslot
-  GIT_TAG        v1.2.3
+  GIT_TAG v1.2.3
 )
 FetchContent_MakeAvailable(sigslot)
 
