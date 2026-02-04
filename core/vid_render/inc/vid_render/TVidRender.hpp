@@ -3,6 +3,7 @@
 #include "utils/TTypeRedef.hpp"
 
 #include <gst/gst.h>
+#include <gst/gstelement.h>
 
 #include "readerwritercircularbuffer.h"
 
@@ -11,13 +12,27 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <concepts>
 #include <memory>
+#include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
 class QQuickItem;
 
 namespace gentau {
+template<typename T>
+struct IsSigslotSignal : std::false_type
+{};
+
+template<typename... Args>
+struct IsSigslotSignal<sigslot::signal<Args...>> : std::true_type
+{};
+
+template<typename T>
+concept SigslotSignal = IsSigslotSignal<T>::value;
+
 class TVidRender : public std::enable_shared_from_this<TVidRender>
 {
   public:
@@ -25,6 +40,46 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	using Buffer    = moodycamel::BlockingReaderWriterCircularBuffer<FramePtr>;
 	using TimePoint = std::chrono::steady_clock::time_point;
 	using Ptr       = std::unique_ptr<TVidRender>;
+
+  public:
+	template<SigslotSignal T>
+	struct SignalWrapper
+	{
+		T& signal;
+
+		template<typename... Args>
+		auto connect(Args&&... args)
+		{
+			return signal.connect(std::forward<Args>(args)...);
+		}
+	};
+
+	struct Signals
+	{
+		sigslot::signal<>                   onEOS;
+		sigslot::signal<u32, std::string>   onError;
+		sigslot::signal<u32, std::string>   onWarning;
+		sigslot::signal<GstState, GstState> onStateChanged;
+	};
+
+	struct SignalView
+	{
+		SignalWrapper<decltype(Signals::onEOS)>          onEOS;
+		SignalWrapper<decltype(Signals::onError)>        onError;
+		SignalWrapper<decltype(Signals::onWarning)>      onWarning;
+		SignalWrapper<decltype(Signals::onStateChanged)> onStateChanged;
+	};
+
+  public:
+	SignalView getSignalView()
+	{
+		return SignalView{
+			{ signals.onEOS },
+			{ signals.onError },
+			{ signals.onWarning },
+			{ signals.onStateChanged },
+		};
+	}
 
   private:
 	GstElement* pipeline;
@@ -39,6 +94,8 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	GstElement* sink;
 
 	Buffer naluBuffer;
+
+	Signals signals;
 
   private:
 	std::atomic<bool>         isRunning         = false;
@@ -59,6 +116,9 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	bool tryPushFrame(
 		FramePtr frame, std::chrono::milliseconds timeout = std::chrono::milliseconds(0)
 	);
+
+  public:
+	Signals& getSignals() { return signals; }
 
   public:
 	bool play();
