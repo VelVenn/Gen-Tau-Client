@@ -6,10 +6,12 @@
 #include "utils/TLog.hpp"
 #include "utils/TLogical.hpp"
 
+#include <gst/gstelement.h>
+#include <gst/gstobject.h>
 #include <gst/gstutils.h>
 #include <stdexcept>
-#include <string>
 #include <string_view>
+#include <vector>
 
 #define T_LOG_TAG_IMG       "[Video Render] "
 #define RENDER_WAIT_FOREVER (0 && GEN_TAU_DEBUG)
@@ -52,7 +54,7 @@ constexpr auto MAX_RENDER_DELAY = 20 * GST_MSECOND;
 void TVidRender::onDecoderPadAdded(GstElement* decoder, GstPad* new_pad, gpointer user_data)
 {
 	TVidRender* self           = static_cast<TVidRender*>(user_data);
-	g_autoptr(GstPad) sink_pad = gst_element_get_static_pad(self->leakyQueue, "sink");
+	g_autoptr(GstPad) sink_pad = gst_element_get_static_pad(self->uploader, "sink");
 
 	GstPadLinkReturn ret;
 	g_autoptr(GstCaps) new_pad_caps = nullptr;
@@ -88,23 +90,64 @@ void TVidRender::onDecoderPadAdded(GstElement* decoder, GstPad* new_pad, gpointe
 	}
 }
 
+GstElement* TVidRender::choosePrefDecoder(bool& isDynamic)
+{
+	vector<const gchar*> candidates = {
+#ifdef __linux__
+		"vah265dec",     // VA-API (Intel/AMD)(high priority in gstreamer)
+		"vaapih265dec",  // VA-API
+		"nvh265dec",     // Nvidia
+#elif defined(WIN32)
+		"d3d12h265dec",  // D3D12
+		"d3d11h265dec",  // D3D11
+		"nvh265dec",     // Nvidia
+		"qsvh265dec",    // QuickSync (Intel)
+#elif defined(__APPLE__)
+		"vtdec_h265_hw",  // VideoToolbox H.265 hardware only
+		"vtdec_hw",       // General VideoToolbox hardware decoder
+		"vtdec_h265",     // VideoToolbox H.265 software
+		"vtdec",
+#endif
+		"avdec_h265",  // FFMPEG software decoder as fallback
+	};
+
+	for (auto name : candidates) {
+		GstElementFactory* factory = gst_element_factory_find(name);
+		if (factory) {
+			// Further verify for gstreamer plugin blacklist
+			GstElement* element = gst_element_factory_create(factory, "decoder");
+			gst_object_unref(GST_OBJECT(factory));
+
+			if (element) {
+				tImgTransLogTrace("Selected H.265 Decoder: '{}'", name);
+				isDynamic = false;
+				return element;
+			}
+		}
+	}
+
+	tImgTransLogWarn("No preferred H.265 decoder found, using 'decodebin' as fallback.");
+	isDynamic = true;
+	return gst_element_factory_make("decodebin", "decoder");
+}
+
 TVidRender::TVidRender(const char* file_path) : naluBuffer(0)
 {
 	// Check in compile-time
 	if constexpr (conf::TDebugMode) {
+		bool linkDynamic = false;
+
 		// We don't need a buffer for file playback
-		pipeline    = gst_pipeline_new("pipeline");
-		src         = gst_element_factory_make("filesrc", "src");
-		parser      = gst_element_factory_make("h265parse", "parser");
-		bufferQueue = gst_element_factory_make("queue", "bufferQueue");
-		decoder     = gst_element_factory_make("decodebin", "decoder");
-		leakyQueue  = gst_element_factory_make("queue", "leakyQueue");
-		colorConv   = gst_element_factory_make("glcolorconvert", "colorConv");
-		uploader    = gst_element_factory_make("glupload", "uploader");
-		// for (auto& overlay : overlays) {
-		// 	overlay = gst_element_factory_make("qml6gloverlay", nullptr);
-		// }
-		sink = gst_element_factory_make("qml6glsink", "sink");
+		pipeline       = gst_pipeline_new("pipeline");
+		src            = gst_element_factory_make("filesrc", "src");
+		parser         = gst_element_factory_make("h265parse", "parser");
+		bufferQueue    = gst_element_factory_make("queue", "bufferQueue");
+		decoder        = choosePrefDecoder(linkDynamic);
+		leakyQueue     = gst_element_factory_make("queue", "leakyQueue");
+		colorConv      = gst_element_factory_make("glcolorconvert", "colorConv");
+		uploader       = gst_element_factory_make("glupload", "uploader");
+		sinkCapsFilter = gst_element_factory_make("capsfilter", "sinkCapsFilter");
+		sink           = gst_element_factory_make("qml6glsink", "sink");
 
 		if (anyFalse(
 				pipeline,
@@ -112,10 +155,10 @@ TVidRender::TVidRender(const char* file_path) : naluBuffer(0)
 				parser,
 				decoder,
 				bufferQueue,
-				leakyQueue,
 				uploader,
 				colorConv,
-				// overlays,
+				leakyQueue,
+				sinkCapsFilter,
 				sink
 			)) {
 			constexpr auto errMsg = "Failed to create all Gstreamer elements."sv;
@@ -129,37 +172,49 @@ TVidRender::TVidRender(const char* file_path) : naluBuffer(0)
 			parser,
 			decoder,
 			bufferQueue,
-			leakyQueue,
 			uploader,
 			colorConv,
+			leakyQueue,
+			sinkCapsFilter,
 			sink,
 			nullptr
 		);
-		// for (auto overlay : overlays) { gst_bin_add(GST_BIN(pipeline), overlay); }
 
-		// auto linkOverlays = [&]() {
-		// 	auto curSrcElement = colorConv;
-		// 	for (auto overlay : overlays) {
-		// 		if (!gst_element_link(curSrcElement, overlay)) { return false; }
-		// 		curSrcElement = overlay;
-		// 	}
+		constexpr auto errMsg =
+			"Failed to link GStreamer elements."sv;  // string_view 在编译期被构造和分配空间
 
-		// 	if (!gst_element_link(curSrcElement, sink)) { return false; }
+		if (linkDynamic) {
+			if (anyFalse(
+					gst_element_link_many(
+						uploader, colorConv, sinkCapsFilter, leakyQueue, sink, nullptr
+					),
+					gst_element_link_many(src, parser, bufferQueue, decoder, nullptr)
+				)) {
+				tImgTransLogCritical("{}", errMsg);
+				throw std::runtime_error(
+					errMsg.data()
+				);  // string_view 仅在从字符串字面量构建时，才保证以 \0 结尾
+			}
 
-		// 	return true;
-		// };
-
-		if (anyFalse(
-				gst_element_link_many(leakyQueue, uploader, colorConv, sink, nullptr),
-				gst_element_link_many(src, parser, bufferQueue, decoder, nullptr)
-				// linkOverlays()
-			)) {
-			constexpr auto errMsg =
-				"Failed to link GStreamer elements."sv;  // string_view 在编译期被构造和分配空间
-			tImgTransLogCritical("{}", errMsg);
-			throw std::runtime_error(
-				errMsg.data()
-			);  // string_view 仅在从字符串字面量构建时，才保证以 \0 结尾
+			g_signal_connect(decoder, "pad-added", G_CALLBACK(onDecoderPadAdded), this);
+			tImgTransLogTrace("Decoder will be linked dynamically");
+		} else {
+			if (!gst_element_link_many(
+					src,
+					parser,
+					bufferQueue,
+					decoder,
+					uploader,
+					colorConv,
+					sinkCapsFilter,
+					leakyQueue,
+					sink,
+					nullptr
+				)) {
+				tImgTransLogCritical("{}", errMsg);
+				throw std::runtime_error(errMsg.data());
+			}
+			tImgTransLogTrace("Decoder will be linked statically");
 		}
 
 		g_object_set(sink, "sync", FALSE, "max-lateness", MAX_RENDER_DELAY, nullptr);
@@ -179,15 +234,25 @@ TVidRender::TVidRender(const char* file_path) : naluBuffer(0)
 			nullptr
 		);
 
+		// Caps string ref: https://fossies.org/linux/gstreamer/tests/check/gst/gstcaps.c
+		// Line 148:156 'non_simple_caps_string' and Line 216:228
+		const gchar* sinkCapStr =
+			"video/x-raw(memory:GLMemory), "
+#ifdef __linux__
+			"format=(string){NV12, RGBA, BGRA}, "
+#elif defined(__APPLE__)
+			"format=(string){RGBA, BGRA}, "
+#endif
+			"texture-target=(string)2D";
+		g_autoptr(GstCaps) caps = gst_caps_from_string(sinkCapStr);
+		g_object_set(sinkCapsFilter, "caps", caps, nullptr);
+
 		if constexpr (conf::TDebugMode) {
 			g_object_set(sink, "widget", nullptr, nullptr);
 			void* res;
 			g_object_get(G_OBJECT(sink), "widget", &res, nullptr);
 			tImgTransLogDebug("qml6glsink widget init to null? -> {}", res == nullptr);
 		}
-
-		g_signal_connect(decoder, "pad-added", G_CALLBACK(onDecoderPadAdded), this);
-
 	} else {
 		constexpr auto errMsg =
 			"Calling TVidRender(const char* file_path) is not supported in release builds."sv;
@@ -220,22 +285,4 @@ void TVidRender::linkSinkWidget(QQuickItem* widget)
 {
 	g_object_set(sink, "widget", widget, nullptr);
 }
-
-// bool TVidRender::linkOverlayWidget(u64 idx, QQuickItem* widget)
-// {
-// 	if (idx >= overlays.size()) {
-// 		tImgTransLogWarn("Overlay index {} out of bounds.", idx);
-// 		return false;
-// 	}
-
-// 	g_object_set(overlays[idx], "widget", widget, nullptr);
-// 	return true;
-// }
-
-// void TVidRender::linkOverlayRoot(QQuickItem* root)
-// {
-// 	for (auto overlay : overlays) {
-// 		g_object_set(overlay, "root", &root, nullptr);
-// 	}
-// }
 }  // namespace gentau

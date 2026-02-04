@@ -166,6 +166,12 @@ int main(int argc, char* argv[])
 	qputenv("_NET_WM_BYPASS_COMPOSITOR", "1");            // 绕过X11合成器以减少延迟
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");  // 禁用Wayland窗口装饰以减少延迟
 
+	if (qEnvironmentVariableIsSet("WAYLAND_DISPLAY")) {
+		qputenv("QT_QPA_PLATFORM", "wayland");
+		qputenv("GST_GL_PLATFORM", "egl");  // 使用EGL作为GST的GL平台
+		qputenv("GST_GL_WINDOW", "wayland");
+	}
+
 	gst_init(&argc, &argv);
 
 	{

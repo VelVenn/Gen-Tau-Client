@@ -90,7 +90,7 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	GstElement* leakyQueue;
 	GstElement* colorConv;
 	GstElement* uploader;
-	// std::array<GstElement*, 2> overlays;
+	GstElement* sinkCapsFilter;
 	GstElement* sink;
 
 	Buffer naluBuffer;
@@ -108,6 +108,8 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 
   private:
 	static void onDecoderPadAdded(GstElement* decoder, GstPad* new_pad, gpointer user_data);
+
+	GstElement* choosePrefDecoder(bool& isDynamic);
 
   private:
 	bool initPipeElements();
