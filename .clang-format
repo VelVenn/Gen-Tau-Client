@@ -23,7 +23,8 @@ AlignConsecutiveShortCaseStatements:
   Enabled: true
   AlignCaseArrows: true
   AlignCaseColons: true
-AlignEscapedNewlines: LeftWithLastLine
+AlignEscapedNewlines: Right 
+AlignOperands: Align
 AllowAllParametersOfDeclarationOnNextLine: "true"
 AllowShortBlocksOnASingleLine: "true"
 AllowShortFunctionsOnASingleLine: Inline
