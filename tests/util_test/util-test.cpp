@@ -67,8 +67,8 @@ int main()
 
 	std::cout << "We should see this very soon:" << std::ctime(&now_t_lit) << std::endl;
 
-	auto lift_to_str            = LiftDefaultParams(std::to_string);
-	auto lift_func_with_default = LiftDefaultParams(func_with_default);
+	auto lift_to_str            = liftDefaultParams(std::to_string);
+	auto lift_func_with_default = liftDefaultParams(func_with_default);
 
 	std::cout << lift_to_str(114514) << std::endl;
 	std::cout << lift_to_str(3.14159) << std::endl;
@@ -78,14 +78,19 @@ int main()
 
 	recv_func(lift_func_with_default);
 
-	if (gentau::allTrue(1, 2, "a string", 3.14, MyType{1, 2})) { cout << "All True!" << endl; }
+	if (gentau::allTrue(1, 2, "a string", 3.14, MyType{ 1, 2 })) { cout << "All True!" << endl; }
 
 	string no_content = "";
-	if (gentau::allFalse(0, no_content, "", 0.0, MyType{0, 0})) { cout << "All False!" << endl; }
+	if (gentau::allFalse(0, no_content, "", 0.0, MyType{ 0, 0 })) { cout << "All False!" << endl; }
 
-	if (gentau::anyTrue(0, "Vilva", 0.0, MyType{0, 0})) { cout << "Any True!" << endl; }
+	if (gentau::anyTrue(0, "Vilva", 0.0, MyType{ 0, 0 })) { cout << "Any True!" << endl; }
 
-	if (gentau::anyFalse(1, 2, "a string", 9.99, MyType{0, 0})) { cout << "Any False!" << endl; }
+	if (gentau::anyFalse(1, 2, "a string", 9.99, MyType{ 0, 0 })) { cout << "Any False!" << endl; }
+
+	std::array<int, 3> arr = { 1, 2, 3 };
+	if (gentau::allTrue(arr)) { cout << "All True!" << endl; }
+	std::vector<string> str_arr = { "a", "b", "" };
+	if (gentau::anyFalse(str_arr)) { cout << "Any False!" << endl; }
 
 	spdlog::shutdown();
 

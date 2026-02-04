@@ -1,5 +1,8 @@
 #pragma once
 
+#include <algorithm>
+#include <concepts>
+#include <ranges>
 #include <string>
 #include <type_traits>
 
@@ -32,11 +35,36 @@ struct TTraits<std::string>
 	static constexpr bool toBool(std::string const& v) { return !v.empty(); }
 };
 
-#define T_TRAITS_DECAY(v) TTraits<std::decay_t<decltype(v)>>::toBool(v)
+namespace impl {
+template<typename T>
+concept IsIterContainer =
+	std::ranges::range<T> && !std::same_as<std::decay_t<T>, std::string> &&
+	!std::same_as<std::decay_t<T>, char const*> && !std::same_as<std::decay_t<T>, char*> &&
+	!std::is_pointer_v<std::decay_t<T>>;
+
+template<bool isAND, bool isNOT>  // AND gate, NOT gate
+constexpr bool solve_logic(const auto& v)
+{
+	if constexpr (IsIterContainer<decltype(v)>) {
+		if constexpr (isAND) {
+			return std::ranges::all_of(v, [](auto const& i) {
+				return solve_logic<isAND, isNOT>(i);
+			});
+		} else {
+			return std::ranges::any_of(v, [](auto const& i) {
+				return solve_logic<isAND, isNOT>(i);
+			});
+		}
+	} else {
+		bool res = TTraits<std::decay_t<decltype(v)>>::toBool(v);
+		return isNOT ? !res : res;
+	}
+}
+}  // namespace impl
 
 constexpr bool allTrue(const auto&... vals)
 {
-	return (... && T_TRAITS_DECAY(vals));
+	return (... && impl::solve_logic<true, false>(vals));
 
 	// expande to (((val1 && val2) && val3) && valN)
 	// if is (vals && ...) will expand to (val1 && (val2 && (val3 && valN)))
@@ -50,19 +78,17 @@ constexpr bool allTrue(const auto&... vals)
 
 constexpr bool allFalse(const auto&... vals)
 {
-	return (... && !T_TRAITS_DECAY(vals));
+	return (... && impl::solve_logic<true, true>(vals));
 }
 
 constexpr bool anyTrue(const auto&... vals)
 {
-	return (... || T_TRAITS_DECAY(vals));
+	return (... || impl::solve_logic<false, false>(vals));
 }
 
 constexpr bool anyFalse(const auto&... vals)
 {
-	return (... || !T_TRAITS_DECAY(vals));
+	return (... || impl::solve_logic<false, true>(vals));
 }
-
-#undef T_TRAITS_DECAY
 
 }  // namespace gentau
