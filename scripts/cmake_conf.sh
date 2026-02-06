@@ -10,6 +10,13 @@ JOBS=""
 
 DO_CLEAN=0
 
+VERBOSE=0
+
+DO_MEM_PROF=0
+LOG=1
+LOG_FILE=1
+LOG_LEVEL="DEFAULT"
+
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         -S|--src-dir)   SRC_DIR="$2";    shift ;;
@@ -18,9 +25,14 @@ while [[ "$#" -gt 0 ]]; do
         -t|--type)      BUILD_TYPE="$2"; shift ;;
         -j|--jobs)      JOBS="$2";       shift ;;
 
-        -v|--verbose)          VERBOSE=1  ;;
-        -b|--build)            DO_BUILD=1 ;;       
-        -C|--clean-rebuild)    DO_CLEAN=1 ;;
+        -v|--verbose)          VERBOSE=1     ;;
+        -b|--build)            DO_BUILD=1    ;;       
+        -C|--clean-rebuild)    DO_CLEAN=1    ;;
+        
+        -n|--no-log)           LOG=0         ;;
+        -N|--no-log-file)      LOG_FILE=0    ;;
+        -L|--log-level)        LOG_LEVEL="$2"; shift ;;
+        -m|--mem-prof)         DO_MEM_PROF=1 ;;
         
         -h|--help)      
             echo "Usage: $0 [options]"
@@ -37,6 +49,11 @@ while [[ "$#" -gt 0 ]]; do
             echo "  -j, --jobs N           Specifies the number of jobs to run simultaneously"
             echo "  -C, --clean-rebuild    Remove build directory before configure"
             echo ""
+            echo "Build Options:"
+            echo "  -m, --mem-prof         Enable memory profiling (default: off)"
+            echo "  -n, --no-log           Disable all logging (default: off)"
+            echo "  -N, --no-log-file      Disable log file output (default: off)"
+            echo "  -L, --log-level LEVEL  Set log level [TRACE|DEBUG|INFO|WARN|ERROR|CRITICAL]"
             echo "General:"
             echo "  -h, --help             Show this help message"
             exit 0 
@@ -65,7 +82,12 @@ if [[ -n "$JOBS" ]]; then
 fi
 echo "========================================"
 
-cmake -S "$SRC_DIR" -G "$GENERATOR" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -B "$BUILD_DIR"
+cmake -S "$SRC_DIR" -G "$GENERATOR" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -B "$BUILD_DIR" \
+    -DGEN_TAU_CMAKE_VERBOSE="$VERBOSE" \
+    -DGEN_TAU_LOG_ENABLED="$LOG" \
+    -DGEN_TAU_LOG_TO_FILE="$LOG_FILE" \
+    -DGEN_TAU_LOG_LEVEL="$LOG_LEVEL" \
+    -DGEN_TAU_USE_ASAN="$DO_MEM_PROF" \
 
 if [ $? -ne 0 ]; then
     echo "Error: CMake Configuration failed."
