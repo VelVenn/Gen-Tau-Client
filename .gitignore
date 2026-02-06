@@ -96,6 +96,8 @@ CMakeLists.txt.user*
 *logs/
 *.log
 
+Testing/
+
 # Clangd specific ignores
 *.clangd
 

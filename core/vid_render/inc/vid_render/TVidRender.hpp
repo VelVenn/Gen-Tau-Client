@@ -112,7 +112,7 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	GstElement* choosePrefDecoder(bool& isDynamic);
 
   private:
-	bool initPipeElements();
+	bool initPipeElements(bool useFileSrc, const char* file_path = nullptr);
 
   public:
 	bool tryPushFrame(

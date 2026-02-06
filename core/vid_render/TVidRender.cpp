@@ -6,9 +6,6 @@
 #include "utils/TLog.hpp"
 #include "utils/TLogical.hpp"
 
-#include <gst/gstelement.h>
-#include <gst/gstobject.h>
-#include <gst/gstutils.h>
 #include <stdexcept>
 #include <string_view>
 #include <vector>
@@ -131,43 +128,24 @@ GstElement* TVidRender::choosePrefDecoder(bool& isDynamic)
 	return gst_element_factory_make("decodebin", "decoder");
 }
 
-TVidRender::TVidRender(const char* file_path) : naluBuffer(0)
+bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
 {
-	// Check in compile-time
-	if constexpr (conf::TDebugMode) {
-		bool linkDynamic = false;
+	bool         linkDynamic = false;
+	const gchar* srcType     = useFileSrc ? "filesrc" : "appsrc";
 
-		// We don't need a buffer for file playback
-		pipeline       = gst_pipeline_new("pipeline");
-		src            = gst_element_factory_make("filesrc", "src");
-		parser         = gst_element_factory_make("h265parse", "parser");
-		bufferQueue    = gst_element_factory_make("queue", "bufferQueue");
-		decoder        = choosePrefDecoder(linkDynamic);
-		leakyQueue     = gst_element_factory_make("queue", "leakyQueue");
-		colorConv      = gst_element_factory_make("glcolorconvert", "colorConv");
-		uploader       = gst_element_factory_make("glupload", "uploader");
-		sinkCapsFilter = gst_element_factory_make("capsfilter", "sinkCapsFilter");
-		sink           = gst_element_factory_make("qml6glsink", "sink");
+	pipeline       = gst_pipeline_new("pipeline");
+	src            = gst_element_factory_make(srcType, "src");
+	parser         = gst_element_factory_make("h265parse", "parser");
+	bufferQueue    = gst_element_factory_make("queue", "bufferQueue");
+	decoder        = choosePrefDecoder(linkDynamic);
+	leakyQueue     = gst_element_factory_make("queue", "leakyQueue");
+	colorConv      = gst_element_factory_make("glcolorconvert", "colorConv");
+	uploader       = gst_element_factory_make("glupload", "uploader");
+	sinkCapsFilter = gst_element_factory_make("capsfilter", "sinkCapsFilter");
+	sink           = gst_element_factory_make("qml6glsink", "sink");
 
-		if (anyFalse(
-				pipeline,
-				src,
-				parser,
-				decoder,
-				bufferQueue,
-				uploader,
-				colorConv,
-				leakyQueue,
-				sinkCapsFilter,
-				sink
-			)) {
-			constexpr auto errMsg = "Failed to create all Gstreamer elements."sv;
-			tImgTransLogCritical("{}", errMsg);
-			throw std::runtime_error(errMsg.data());
-		}
-
-		gst_bin_add_many(
-			GST_BIN(pipeline),
+	if (anyFalse(
+			pipeline,
 			src,
 			parser,
 			decoder,
@@ -176,83 +154,151 @@ TVidRender::TVidRender(const char* file_path) : naluBuffer(0)
 			colorConv,
 			leakyQueue,
 			sinkCapsFilter,
-			sink,
-			nullptr
-		);
-
-		constexpr auto errMsg =
-			"Failed to link GStreamer elements."sv;  // string_view 在编译期被构造和分配空间
-
-		if (linkDynamic) {
-			if (anyFalse(
-					gst_element_link_many(
-						uploader, colorConv, sinkCapsFilter, leakyQueue, sink, nullptr
-					),
-					gst_element_link_many(src, parser, bufferQueue, decoder, nullptr)
-				)) {
-				tImgTransLogCritical("{}", errMsg);
-				throw std::runtime_error(
-					errMsg.data()
-				);  // string_view 仅在从字符串字面量构建时，才保证以 \0 结尾
-			}
-
-			g_signal_connect(decoder, "pad-added", G_CALLBACK(onDecoderPadAdded), this);
-			tImgTransLogTrace("Decoder will be linked dynamically");
-		} else {
-			if (!gst_element_link_many(
-					src,
-					parser,
-					bufferQueue,
-					decoder,
-					uploader,
-					colorConv,
-					sinkCapsFilter,
-					leakyQueue,
-					sink,
-					nullptr
-				)) {
-				tImgTransLogCritical("{}", errMsg);
-				throw std::runtime_error(errMsg.data());
-			}
-			tImgTransLogTrace("Decoder will be linked statically");
+			sink
+		)) {
+		for (auto elem : { pipeline,
+						   src,
+						   parser,
+						   decoder,
+						   bufferQueue,
+						   uploader,
+						   colorConv,
+						   leakyQueue,
+						   sinkCapsFilter,
+						   sink }) {
+			if (elem) { gst_object_unref(elem); }
 		}
 
-		g_object_set(sink, "sync", FALSE, "max-lateness", MAX_RENDER_DELAY, nullptr);
+		constexpr auto errMsg = "Failed to create all Gstreamer elements."sv;
+		tImgTransLogCritical("{}", errMsg);
+		throw std::runtime_error(errMsg.data());
+	}
+
+	gst_bin_add_many(
+		GST_BIN(pipeline),
+		src,
+		parser,
+		decoder,
+		bufferQueue,
+		uploader,
+		colorConv,
+		leakyQueue,
+		sinkCapsFilter,
+		sink,
+		nullptr
+	);
+
+	constexpr auto errMsg =
+		"Failed to link GStreamer elements."sv;  // string_view 在编译期被构造和分配空间
+
+	if (linkDynamic) {
+		if (anyFalse(
+				gst_element_link_many(
+					uploader, colorConv, sinkCapsFilter, leakyQueue, sink, nullptr
+				),
+				gst_element_link_many(src, parser, bufferQueue, decoder, nullptr)
+			)) {
+			gst_object_unref(pipeline);
+			tImgTransLogCritical("{}", errMsg);
+			throw std::runtime_error(
+				errMsg.data()
+			);  // string_view 仅在从字符串字面量构建时，才保证以 \0 结尾
+		}
+
+		g_signal_connect(decoder, "pad-added", G_CALLBACK(onDecoderPadAdded), this);
+		tImgTransLogTrace("Decoder will be linked dynamically");
+	} else {
+		if (!gst_element_link_many(
+				src,
+				parser,
+				bufferQueue,
+				decoder,
+				uploader,
+				colorConv,
+				sinkCapsFilter,
+				leakyQueue,
+				sink,
+				nullptr
+			)) {
+			gst_object_unref(pipeline);
+			tImgTransLogCritical("{}", errMsg);
+			throw std::runtime_error(errMsg.data());
+		}
+		tImgTransLogTrace("Decoder will be linked statically");
+	}
+
+	g_object_set(sink, "sync", FALSE, "max-lateness", MAX_RENDER_DELAY, nullptr);
+	if (useFileSrc) {
 		g_object_set(src, "location", file_path, nullptr);
-		g_object_set(parser, "config-interval", -1, nullptr);
-		g_object_set(bufferQueue, "max-size-buffers", 2, "leaky", 0, nullptr);
+	} else {
+		g_autoptr(GstCaps) appCaps = gst_caps_from_string("video/x-h265");
 		g_object_set(
-			leakyQueue,
-			"max-size-buffers",
-			2,
-			"max-size-bytes",
-			0,  // Disabled
-			"max-size-time",
-			0,  // Disabled
-			"leaky",
-			2,  // downstream
+			src,
+			"caps",
+			appCaps,
+			"is-live",
+			TRUE,
+			"do-timestamp",
+			TRUE,
+			"min-latency",
+			0,
+			"max-latency",
+			-1,  // Unlimited
+			"max-bytes",
+			(guint64)(80 * 1000),  // 80KB, adjust as needed
+			"format",
+			GST_FORMAT_TIME,
+			"stream-type",
+			0,  // GST_APP_STREAM_TYPE_STREAM
+			"emit-signals",
+			FALSE,
 			nullptr
 		);
+	}
 
-		// Caps string ref: https://fossies.org/linux/gstreamer/tests/check/gst/gstcaps.c
-		// Line 148:156 'non_simple_caps_string' and Line 216:228
-		const gchar* sinkCapStr =
-			"video/x-raw(memory:GLMemory), "
+	g_object_set(parser, "config-interval", -1, nullptr);
+	g_object_set(bufferQueue, "max-size-buffers", 2, "leaky", 0, nullptr);
+	g_object_set(
+		leakyQueue,
+		"max-size-buffers",
+		1,  // Only keep the last frame
+		"max-size-bytes",
+		0,  // Disabled
+		"max-size-time",
+		0,  // Disabled
+		"leaky",
+		2,  // downstream
+		nullptr
+	);
+
+	// Caps string ref: https://fossies.org/linux/gstreamer/tests/check/gst/gstcaps.c
+	// Line 148:156 'non_simple_caps_string' and Line 216:228
+	const gchar* sinkCapStr =
+		"video/x-raw(memory:GLMemory), "
 #ifdef __linux__
-			"format=(string){NV12, RGBA, BGRA}, "
+		"format=(string){NV12, RGBA, BGRA}, "
 #elif defined(__APPLE__)
-			"format=(string){RGBA, BGRA}, "
+		"format=(string){RGBA, BGRA}, "
 #endif
-			"texture-target=(string)2D";
-		g_autoptr(GstCaps) caps = gst_caps_from_string(sinkCapStr);
-		g_object_set(sinkCapsFilter, "caps", caps, nullptr);
+		"texture-target=(string)2D";
+	g_autoptr(GstCaps) caps =
+		gst_caps_from_string(sinkCapStr);  // This API's behavior is not stable under 1.20
+	g_object_set(sinkCapsFilter, "caps", caps, nullptr);
 
-		if constexpr (conf::TDebugMode) {
-			g_object_set(sink, "widget", nullptr, nullptr);
-			void* res;
-			g_object_get(G_OBJECT(sink), "widget", &res, nullptr);
-			tImgTransLogDebug("qml6glsink widget init to null? -> {}", res == nullptr);
-		}
+	if constexpr (conf::TDebugMode) {
+		g_object_set(sink, "widget", nullptr, nullptr);
+		void* res;
+		g_object_get(G_OBJECT(sink), "widget", &res, nullptr);
+		tImgTransLogDebug("qml6glsink widget init to null? -> {}", res == nullptr);
+	}
+	return true;
+}
+
+TVidRender::TVidRender(const char* file_path) : naluBuffer(0)
+{
+	// Check in compile-time
+	if constexpr (conf::TDebugMode) {
+		initPipeElements(true, file_path);
 	} else {
 		constexpr auto errMsg =
 			"Calling TVidRender(const char* file_path) is not supported in release builds."sv;
