@@ -77,4 +77,10 @@ else()
   message(STATUS "-> Logging disabled")
   add_compile_definitions(SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF)
 endif()
+
+if(GEN_TAU_LOG_TO_FILE AND GEN_TAU_LOG_ENABLED)
+  message(STATUS "-> Log to file enabled")
+else()
+  message(STATUS "-> Log to file disabled")
+endif()
 # ======================== GEN_TAU GLOBAL LOG SETTINGS ===========================

@@ -7,6 +7,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 include(TProjOptions)
 include(TProjSettings)
+include(TCompileOptions)
 include(TDependencies)
 include(TRegister)
 include(TExtraInfo)
@@ -22,7 +23,7 @@ add_subdirectory(app)
 # ============================= GEN_TAU ENABLE TESTS =============================
 if(GEN_TAU_BUILD_TESTS)
   message(STATUS "-> Building tests")
-  # enable_testing()
+  enable_testing()
   add_subdirectory(tests)
 endif()
 # ============================= GEN_TAU ENABLE TESTS =============================

@@ -199,9 +199,9 @@ endfunction()
 # Test registration function
 # ============================================================================
 function(gt_register_test)
-  set(options USE_QT USE_CTEST)
+  set(options USE_QT USE_CTEST USE_GTEST NO_GMAIN)
   set(oneValueArgs NAME QML_URI)
-  set(multiValueArgs SRC QML_FILES DEPS)
+  set(multiValueArgs SRC QML_FILES DEPS GTEST_ARGS)
 
   cmake_parse_arguments(PARSE_ARGV 0 GT_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}")
 
@@ -231,7 +231,7 @@ function(gt_register_test)
   endif()
   # ===============
 
-  # 创建可执行文件
+  # 创建可执行文件目标
   if(GT_TEST_USE_QT)
     qt_add_executable(${GT_TEST_NAME} ${GT_TEST_SRC})
 
@@ -265,8 +265,34 @@ function(gt_register_test)
   )
   # ===============
 
+  # 检查测试框架选项冲突
+  if(GT_TEST_USE_GTEST AND GT_TEST_USE_CTEST)
+    message(FATAL_ERROR "!! gt_register_test -> ${GT_TEST_NAME}: You should NOT enable both GTest and CTest for the same test !!")
+  endif()
+
+  if(NOT GT_TEST_USE_GTEST AND (GT_TEST_NO_GMAIN OR GT_TEST_GTEST_ARGS))
+    message(WARNING "! gt_register_test -> ${GT_TEST_NAME}: GTest options specified but GTest not enabled, ignored !")
+  endif()
+  # ===============
+
   # 解析依赖
-  foreach(dep ${GT_TEST_DEPS})
+  set(FINAL_DEPS ${GT_TEST_DEPS})
+
+  # GTest库去重
+  if(GT_TEST_USE_GTEST)
+    if(NOT "GTest::gtest" IN_LIST FINAL_DEPS AND NOT "gtest" IN_LIST FINAL_DEPS)
+      list(APPEND FINAL_DEPS "GTest::gtest")
+    endif()
+
+    if(NOT GT_TEST_NO_GMAIN)
+      if(NOT "GTest::gtest_main" IN_LIST FINAL_DEPS AND NOT "gtest_main" IN_LIST FINAL_DEPS)
+        list(APPEND FINAL_DEPS "GTest::gtest_main")
+      endif()
+    endif()
+  endif()
+
+  set(RESOLVED_DEPS "")
+  foreach(dep ${FINAL_DEPS})
     get_property(internal_mod GLOBAL PROPERTY GEN_TAU_MODULES_${dep})
     if(internal_mod)
       list(APPEND RESOLVED_DEPS ${internal_mod})
@@ -281,13 +307,31 @@ function(gt_register_test)
   endif()
   # ===============
 
-  # 添加到 CTest
+  # 设置GTest参数
+  if(GT_TEST_USE_GTEST)
+    if(COMMAND gtest_discover_tests)
+      set(FINAL_GTEST_ARGS ${GT_TEST_GTEST_ARGS})
+
+      if(NOT "DISCOVERY_MODE" IN_LIST FINAL_GTEST_ARGS)
+        list(APPEND FINAL_GTEST_ARGS "DISCOVERY_MODE" "PRE_TEST")
+        message(STATUS "gt_register_test -> ${GT_TEST_NAME}: GTest DISCOVERY_MODE not specified, setting to PRE_TEST")
+      endif()
+
+      # message(STATUS "gt_register_test -> ${GT_TEST_NAME}: Registering GTest test discovery with arguments:\n ${FINAL_GTEST_ARGS}")
+      gtest_discover_tests(${GT_TEST_NAME} ${FINAL_GTEST_ARGS})
+    else()
+      message(FATAL_ERROR "!! gt_register_test -> ${GT_TEST_NAME}: 'gtest_discover_tests' command not found. Make sure you have 'include(GoogleTest)' before registering this test !!")
+    endif()
+  endif()
+  # ===============
+
+  # 注册到CTest
   if(GT_TEST_USE_CTEST)
     add_test(NAME ${GT_TEST_NAME} COMMAND ${GT_TEST_NAME})
   endif()
   # ===============
 
   # 注册完成
-  message(STATUS "✓ Test registered: ${GT_TEST_NAME} [Qt:${GT_TEST_USE_QT}, CTest:${GT_TEST_USE_CTEST}]")
+  message(STATUS "✓ Test registered: ${GT_TEST_NAME} [Qt:${GT_TEST_USE_QT}, GTest:${GT_TEST_USE_GTEST}, CTest:${GT_TEST_USE_CTEST}]")
 
 endfunction()
