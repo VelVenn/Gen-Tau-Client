@@ -6,8 +6,11 @@
 #include "utils/TLog.hpp"
 #include "utils/TLogical.hpp"
 
+#include <gst/app/app.h>
+
 #include <stdexcept>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #define T_LOG_TAG_IMG       "[Video Render] "
@@ -91,13 +94,13 @@ GstElement* TVidRender::choosePrefDecoder(bool& isDynamic)
 {
 	vector<const gchar*> candidates = {
 #ifdef __linux__
+		"nvh265dec",     // Nvidia
 		"vah265dec",     // VA-API (Intel/AMD)(high priority in gstreamer)
 		"vaapih265dec",  // VA-API
-		"nvh265dec",     // Nvidia
 #elif defined(WIN32)
+		"nvh265dec",     // Nvidia
 		"d3d12h265dec",  // D3D12
 		"d3d11h265dec",  // D3D11
-		"nvh265dec",     // Nvidia
 		"qsvh265dec",    // QuickSync (Intel)
 #elif defined(__APPLE__)
 		"vtdec_h265_hw",  // VideoToolbox H.265 hardware only
@@ -123,9 +126,55 @@ GstElement* TVidRender::choosePrefDecoder(bool& isDynamic)
 		}
 	}
 
-	tImgTransLogWarn("No preferred H.265 decoder found, using 'decodebin' as fallback.");
+	string warnMsg = "No preferred hardware decoder found, falling back to software decodebin. Performance may be suboptimal.";	
+	tImgTransLogWarn("{}", warnMsg);
+
 	isDynamic = true;
 	return gst_element_factory_make("decodebin", "decoder");
+}
+
+bool TVidRender::initBusThread()
+{
+	if (!pipeline) {
+		constexpr auto errMsg = "Pipeline is not initialized, cannot start bus thread."sv;
+		tImgTransLogCritical("{}", errMsg);
+		throw std::runtime_error(errMsg.data());
+	}
+
+	busThread = jthread(
+		[this](stop_token sToken) {
+			GstBus* bus = gst_element_get_bus(pipeline);
+			while (!sToken.stop_requested()) {
+				GstMessage* msg = gst_bus_timed_pop(bus, GST_MSECOND * 100);
+				if (msg) {
+					GError* err;
+					gchar*  debug;
+					switch (GST_MESSAGE_TYPE(msg)) {
+						case GST_MESSAGE_ERROR:
+							gst_message_parse_error(msg, &err, &debug);
+							tImgTransLogError(
+								"\n=========== ERROR ==========\nError: {}\nDebug: {}\n============================\n",
+								err->message,
+								debug
+							);
+							g_error_free(err);
+							g_free(debug);
+							break;
+						case GST_MESSAGE_WARNING:
+							gst_message_parse_warning(msg, &err, &debug);
+							tImgTransLogWarn("Warning: {}\nDebug: {}", err->message, debug);
+							g_error_free(err);
+							g_free(debug);
+							break;
+						default:
+							break;
+					}
+					gst_message_unref(msg);
+				}
+			}
+			gst_object_unref(bus);
+		}
+	);
 }
 
 bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
@@ -231,26 +280,24 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
 	if (useFileSrc) {
 		g_object_set(src, "location", file_path, nullptr);
 	} else {
-		g_autoptr(GstCaps) appCaps = gst_caps_from_string("video/x-h265");
+		// 指定appsrc的caps属性('video/x-265')可能会导致h265parse在解析时更严格，从而导致播放卡死，因此暂不指定caps
 		g_object_set(
 			src,
-			"caps",
-			appCaps,
 			"is-live",
 			TRUE,
-			"do-timestamp",
-			TRUE,
 			"min-latency",
-			0,
+			0,  // No latency, push frames as soon as possible
 			"max-latency",
-			-1,  // Unlimited
+			-1,  // Send at best effort
 			"max-bytes",
-			(guint64)(80 * 1000),  // 80KB, adjust as needed
+			(guint64)(80 * 1000),  // Serial baud rate at 912600 (8N1), bandwidth is about 90KB/s
 			"format",
-			GST_FORMAT_TIME,
+			GST_FORMAT_BYTES,
 			"stream-type",
-			0,  // GST_APP_STREAM_TYPE_STREAM
+			GST_APP_STREAM_TYPE_STREAM,
 			"emit-signals",
+			FALSE,
+			"block",
 			FALSE,
 			nullptr
 		);
@@ -285,16 +332,10 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
 		gst_caps_from_string(sinkCapStr);  // This API's behavior is not stable under 1.20
 	g_object_set(sinkCapsFilter, "caps", caps, nullptr);
 
-	if constexpr (conf::TDebugMode) {
-		g_object_set(sink, "widget", nullptr, nullptr);
-		void* res;
-		g_object_get(G_OBJECT(sink), "widget", &res, nullptr);
-		tImgTransLogDebug("qml6glsink widget init to null? -> {}", res == nullptr);
-	}
 	return true;
 }
 
-TVidRender::TVidRender(const char* file_path) : naluBuffer(0)
+TVidRender::TVidRender(const char* file_path)
 {
 	// Check in compile-time
 	if constexpr (conf::TDebugMode) {
@@ -307,6 +348,11 @@ TVidRender::TVidRender(const char* file_path) : naluBuffer(0)
 	}
 }
 
+TVidRender::TVidRender()
+{
+	initPipeElements(false);
+}
+
 TVidRender::~TVidRender()
 {
 	if (pipeline) {
@@ -314,6 +360,45 @@ TVidRender::~TVidRender()
 		gst_object_unref(pipeline);
 		pipeline = nullptr;
 	}
+
+	isRunning.store(false);
+}
+
+bool TVidRender::tryPushFrame(TVidRender::FramePtr frame)
+{
+	if (!isRunning.load()) {
+		tImgTransLogWarn("Attempted to push frame while renderer is not running.");
+		return false;
+	}
+
+	// tImgTransLogDebug("Start to push");
+
+	auto raw_vec_ptr = frame.release();
+
+	// 2. 使用 wrapped_full，并提供一个自定义的释放回调
+	GstBuffer* buffer = gst_buffer_new_wrapped_full(
+		GST_MEMORY_FLAG_READONLY,
+		raw_vec_ptr->data(),  // 内存地址
+		raw_vec_ptr->size(),  // 内存大小
+		0,                    // 偏移
+		raw_vec_ptr->size(),  // 实际大小
+		raw_vec_ptr,          // user_data: 传入 vector 指针
+		[](gpointer data) {
+			auto p = static_cast<std::vector<u8>*>(data);
+			delete p;
+		}
+	);
+
+	if (buffer) {
+		auto ret = gst_app_src_push_buffer(GST_APP_SRC(src), buffer);
+		if (ret != GST_FLOW_OK) {
+			tImgTransLogError("Failed to push buffer to appsrc, error: {}", gst_flow_get_name(ret));
+			return false;
+		}
+	}
+
+	// tImgTransLogDebug("Push is over");
+	return true;
 }
 
 bool TVidRender::play()
@@ -324,6 +409,7 @@ bool TVidRender::play()
 		return false;
 	}
 	tImgTransLogInfo("Pipeline set to PLAYING state.");
+	isRunning.store(true);
 	return true;
 }
 

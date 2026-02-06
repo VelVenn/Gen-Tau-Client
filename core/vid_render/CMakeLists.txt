@@ -8,4 +8,7 @@ gt_register_mod(
     readerwriterqueue
     Pal::Sigslot 
     PkgConfig::GST
+
+    PRIVATE
+      PkgConfig::GST_APP
 )

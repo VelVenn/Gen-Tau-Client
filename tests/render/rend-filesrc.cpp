@@ -147,13 +147,13 @@ typedef class _GstPipeData : public enable_shared_from_this<_GstPipeData>
 class RunningTask : public QRunnable
 {
   public:
-	RunningTask(shared_ptr<RENDER_T> pipe_data) : m_pipe_data(pipe_data) {}
+	RunningTask(shared_ptr<RENDER_T> pipe_data) : m_sender(pipe_data) {}
 	~RunningTask() override = default;
 
-	void run() override { m_pipe_data->play(); }
+	void run() override { m_sender->play(); }
 
   private:
-	shared_ptr<RENDER_T> m_pipe_data;
+	shared_ptr<RENDER_T> m_sender;
 };
 
 int main(int argc, char* argv[])
@@ -192,7 +192,7 @@ int main(int argc, char* argv[])
 			[]() { QCoreApplication::exit(-1); },
 			Qt::QueuedConnection
 		);
-		engine.loadFromModule("Gentau.Test.Render", "RendTest");
+		engine.loadFromModule("Gentau.Test.Render.Filesrc", "RendTest");
 
 		// 检查根对象
 		if (engine.rootObjects().isEmpty()) { qFatal("QML load failed (Root Objects empty)."); }

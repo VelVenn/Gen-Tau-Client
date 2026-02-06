@@ -16,10 +16,22 @@
 # )
 
 gt_register_test(
-  NAME gst-rend-test
-  SRC gst-rend-test.cpp
+  NAME rend-filesrc
+  SRC rend-filesrc.cpp
   USE_QT
-  QML_URI Render
+  QML_URI Render.Filesrc
+  QML_FILES qml/RendTest.qml
+  DEPS
+    vid-render
+    Qt6::Quick
+    PkgConfig::GST
+)
+
+gt_register_test(
+  NAME rend-appsrc
+  SRC rend-appsrc.cpp
+  USE_QT
+  QML_URI Render.Appsrc
   QML_FILES qml/RendTest.qml
   DEPS
     vid-render

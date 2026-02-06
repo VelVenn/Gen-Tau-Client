@@ -37,7 +37,6 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 {
   public:
 	using FramePtr  = std::unique_ptr<std::vector<u8>>;
-	using Buffer    = moodycamel::BlockingReaderWriterCircularBuffer<FramePtr>;
 	using TimePoint = std::chrono::steady_clock::time_point;
 	using Ptr       = std::unique_ptr<TVidRender>;
 
@@ -56,17 +55,17 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 
 	struct Signals
 	{
-		sigslot::signal<>                   onEOS;
-		sigslot::signal<u32, std::string>   onError;
-		sigslot::signal<u32, std::string>   onWarning;
-		sigslot::signal<GstState, GstState> onStateChanged;
+		sigslot::signal<>                              onEOS;
+		sigslot::signal<u32, std::string, std::string> onPipeError;
+		sigslot::signal<u32, std::string, std::string> onPipeWarn;
+		sigslot::signal<GstState, GstState>            onStateChanged;
 	};
 
 	struct SignalView
 	{
 		SignalWrapper<decltype(Signals::onEOS)>          onEOS;
-		SignalWrapper<decltype(Signals::onError)>        onError;
-		SignalWrapper<decltype(Signals::onWarning)>      onWarning;
+		SignalWrapper<decltype(Signals::onPipeError)>     onGstError;
+		SignalWrapper<decltype(Signals::onPipeWarn)>      onGstWarn;
 		SignalWrapper<decltype(Signals::onStateChanged)> onStateChanged;
 	};
 
@@ -75,8 +74,8 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	{
 		return SignalView{
 			{ signals.onEOS },
-			{ signals.onError },
-			{ signals.onWarning },
+			{ signals.onPipeError },
+			{ signals.onPipeWarn },
 			{ signals.onStateChanged },
 		};
 	}
@@ -92,8 +91,6 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	GstElement* uploader;
 	GstElement* sinkCapsFilter;
 	GstElement* sink;
-
-	Buffer naluBuffer;
 
 	Signals signals;
 
@@ -113,11 +110,10 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 
   private:
 	bool initPipeElements(bool useFileSrc, const char* file_path = nullptr);
+	bool initBusThread();
 
   public:
-	bool tryPushFrame(
-		FramePtr frame, std::chrono::milliseconds timeout = std::chrono::milliseconds(0)
-	);
+	bool tryPushFrame(FramePtr frame);
 
   public:
 	Signals& getSignals() { return signals; }
