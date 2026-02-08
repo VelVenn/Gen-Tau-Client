@@ -3,12 +3,12 @@ gt_register_mod(
   TYPE STATIC
   SRC TVidRender.cpp
   DEPS
-    conf
     utils
     readerwriterqueue
     Pal::Sigslot 
     PkgConfig::GST
 
     PRIVATE
+      conf
       PkgConfig::GST_APP
 )

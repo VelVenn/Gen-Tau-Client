@@ -1,7 +1,9 @@
 #include <qquickwindow.h>
+#include <climits>
+#include <cstdint>
 
-#include "utils/TLog.hpp"
 #include "conf/version.hpp"
+#include "utils/TLog.hpp"
 #include "vid_render/TVidRender.hpp"
 
 #include <QGuiApplication>
@@ -14,6 +16,7 @@
 #include <iostream>
 #include <memory>
 #include <thread>
+#include <vector>
 
 using namespace std;
 
@@ -47,13 +50,41 @@ void MockSender::run()
 		return;
 	}
 
+	renderer->getSignalView().onStateChanged.connect([](gentau::TVidRender::StateType oState,
+														gentau::TVidRender::StateType nState) {
+		tImgTransLogInfo(
+			"Sender checked: Renderer state changed from {} to {}",
+			gentau::TVidRender::getStateLiteral(oState),
+			gentau::TVidRender::getStateLiteral(nState)
+		);
+	});
+
+	renderer->getSignalView().onPipeError.connect([](gentau::TVidRender::IssueType iType,
+													 const string&                 src,
+													 const string&                 msg,
+													 const string&                 debug) {
+		tImgTransLogError(
+			"Sender checked: Renderer Pipe Error | Type: {} | Source: {} | Message: {} | Debug: {}",
+			gentau::TVidRender::getIssueTypeLiteral(iType),
+			src,
+			msg,
+			debug
+		);
+	});
+
 	renderer->play();
 
 	senderThread = jthread([this](stop_token stoken) {
-		const size_t       bufferSize = 92 * 1024;  // 92 KB buffer, adjust as needed
+		const size_t       bufferSize = 10 * 1024;  // Must over 1K
 		vector<gentau::u8> buffer(bufferSize);
 
-		size_t bytesReadTotal = 0;
+		size_t bytesReadTotal = 1;
+		int    sendLessOrNot  = 0;
+		int    sendLessInv    = 10;
+		int    sendLess       = 0;
+
+		int postErrOrNot = 0;
+		int postErrInv   = 50;
 
 		while (!stoken.stop_requested() &&
 			   (vidSrc.read(reinterpret_cast<char*>(buffer.data()), bufferSize) ||
@@ -62,12 +93,22 @@ void MockSender::run()
 			// tImgTransLogDebug("Read {} bytes from video source.", bytesRead);
 			// bytesReadTotal += bytesRead;
 			// tImgTransLogDebug("Total bytes read so far: {}", bytesReadTotal);
-			auto frameData =
-				make_unique<vector<gentau::u8>>(buffer.begin(), buffer.begin() + bytesRead);
+
+			unique_ptr<vector<gentau::u8>> frameData;
+
+			if (++sendLessOrNot % sendLessInv == 0) {
+				frameData = make_unique<vector<gentau::u8>>(
+					buffer.begin(), buffer.begin() + bytesRead - sendLess
+				);
+			} else {
+				frameData =
+					make_unique<vector<gentau::u8>>(buffer.begin(), buffer.begin() + bytesRead);
+			}
+
+			if (++postErrOrNot % postErrInv == 0) { renderer->postTestError(); }
 
 			renderer->tryPushFrame(std::move(frameData));
-
-			this_thread::sleep_for(chrono::milliseconds(33));
+			// this_thread::sleep_for(chrono::milliseconds(33));
 			// tImgTransLogDebug("Push down, trying to push next");
 		}
 		cout << "Sender thread finished." << endl;
@@ -95,8 +136,8 @@ int main(int argc, char* argv[])
 {
 	gst_init(&argc, &argv);
 
-	qputenv("QSG_RENDER_TIMING", "1");                    // 启用渲染时间测量
-	qputenv("QSG_RENDER_LOOP", "basic");                  // 强制基础渲染循环
+	// qputenv("QSG_RENDER_TIMING", "1");  // 启用渲染时间测量
+	// qputenv("QSG_RENDER_LOOP", "basic");                  // 强制基础渲染循环
 	qputenv("__GL_SYNC_TO_VBLANK", "0");                  // 禁用NVIDIA VSync
 	qputenv("vblank_mode", "0");                          // 禁用Mesa VSync
 	qputenv("_NET_WM_BYPASS_COMPOSITOR", "1");            // 绕过X11合成器以减少延迟

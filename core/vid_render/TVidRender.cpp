@@ -2,13 +2,16 @@
 
 #include "conf/version.hpp"
 
-#include "utils/TDeduction.hpp"
 #include "utils/TLog.hpp"
 #include "utils/TLogical.hpp"
 
 #include <gst/app/app.h>
 
+#include <gst/gstpad.h>
+#include <exception>
+#include <future>
 #include <stdexcept>
+#include <stop_token>
 #include <string_view>
 #include <thread>
 #include <vector>
@@ -22,7 +25,7 @@ namespace gentau {
 #if RENDER_WAIT_FOREVER == 1
 constexpr gint64 MAX_RENDER_DELAY = -1;
 #else
-constexpr auto MAX_RENDER_DELAY = 20 * GST_MSECOND;
+constexpr auto MAX_RENDER_DELAY = 25 * GST_MSECOND;
 #endif
 
 // Refcounting of Gstreamer objects
@@ -53,8 +56,9 @@ constexpr auto MAX_RENDER_DELAY = 20 * GST_MSECOND;
 
 void TVidRender::onDecoderPadAdded(GstElement* decoder, GstPad* new_pad, gpointer user_data)
 {
-	TVidRender* self           = static_cast<TVidRender*>(user_data);
-	g_autoptr(GstPad) sink_pad = gst_element_get_static_pad(self->uploader, "sink");
+	TVidRender* self               = static_cast<TVidRender*>(user_data);
+	g_autoptr(GstElement) uploader = gst_bin_get_by_name(GST_BIN(self->fixedPipe), "uploader");
+	g_autoptr(GstPad) sink_pad     = gst_element_get_static_pad(uploader, "sink");
 
 	GstPadLinkReturn ret;
 	g_autoptr(GstCaps) new_pad_caps = nullptr;
@@ -126,8 +130,7 @@ GstElement* TVidRender::choosePrefDecoder(bool& isDynamic)
 		}
 	}
 
-	string warnMsg = "No preferred hardware decoder found, falling back to software decodebin. Performance may be suboptimal.";	
-	tImgTransLogWarn("{}", warnMsg);
+	tImgTransLogWarn("No preferred decoder found, falling back to software decodebin.");
 
 	isDynamic = true;
 	return gst_element_factory_make("decodebin", "decoder");
@@ -135,46 +138,126 @@ GstElement* TVidRender::choosePrefDecoder(bool& isDynamic)
 
 bool TVidRender::initBusThread()
 {
-	if (!pipeline) {
+	if (!pipeline()) {
 		constexpr auto errMsg = "Pipeline is not initialized, cannot start bus thread."sv;
 		tImgTransLogCritical("{}", errMsg);
 		throw std::runtime_error(errMsg.data());
 	}
 
-	busThread = jthread(
-		[this](stop_token sToken) {
-			GstBus* bus = gst_element_get_bus(pipeline);
-			while (!sToken.stop_requested()) {
-				GstMessage* msg = gst_bus_timed_pop(bus, GST_MSECOND * 100);
-				if (msg) {
-					GError* err;
-					gchar*  debug;
-					switch (GST_MESSAGE_TYPE(msg)) {
-						case GST_MESSAGE_ERROR:
-							gst_message_parse_error(msg, &err, &debug);
-							tImgTransLogError(
-								"\n=========== ERROR ==========\nError: {}\nDebug: {}\n============================\n",
-								err->message,
-								debug
-							);
-							g_error_free(err);
-							g_free(debug);
-							break;
-						case GST_MESSAGE_WARNING:
-							gst_message_parse_warning(msg, &err, &debug);
-							tImgTransLogWarn("Warning: {}\nDebug: {}", err->message, debug);
-							g_error_free(err);
-							g_free(debug);
-							break;
-						default:
-							break;
-					}
-					gst_message_unref(msg);
+	promise<void> threadErrPassThru;
+	auto          passThruFuture = threadErrPassThru.get_future();
+
+	// lamba捕获变量时会默认将其视为const成员
+	busThread = jthread([this, passThru = std::move(threadErrPassThru)](stop_token sToken) mutable {
+		g_autoptr(GstBus) bus = gst_element_get_bus(fixedPipe);
+
+		if (!bus) {
+			constexpr auto errMsg = "Failed to get bus from pipeline."sv;
+			tImgTransLogCritical("{}", errMsg);
+			passThru.set_exception(make_exception_ptr(runtime_error(errMsg.data())));
+			return;
+		}
+
+		passThru.set_value();  // Notify main thread init success
+
+		auto issueParser = [this](GstMessage* msg, bool asPipeErr) {
+			g_autoptr(GError) err       = nullptr;
+			g_autofree gchar* debugInfo = nullptr;
+			IssueType         iType     = IssueType::UNKNOWN;
+			string            errSrc    = msg->src ? GST_ELEMENT_NAME(msg->src) : "Unknown";
+
+			gst_message_parse_error(msg, &err, &debugInfo);
+
+			if (err) {
+				auto domain = err->domain;
+
+				if (domain == GST_CORE_ERROR || domain == GST_LIBRARY_ERROR) {
+					iType = IssueType::ENGINE_INTERNAL;
+				} else if (domain == GST_STREAM_ERROR) {
+					iType = IssueType::ENGINE_STREAM;
+				} else if (domain == GST_RESOURCE_ERROR) {
+					iType = IssueType::ENGINE_RESOURCE;
+				} else {
+					iType = IssueType::ENGINE_OTHER;
+				}
+
+				if (asPipeErr) {
+					signals.onPipeError(iType, errSrc, err->message, debugInfo ? debugInfo : "");
+
+					tImgTransLogError(
+						"Render Engine error: {} | Debug info : {}",
+						err->message,
+						debugInfo ? debugInfo : "(none)"
+					);
+				} else {
+					signals.onPipeWarn(iType, errSrc, err->message, debugInfo ? debugInfo : "");
+
+					tImgTransLogWarn(
+						"Render Engine warning: {} | Debug info : {}",
+						err->message,
+						debugInfo ? debugInfo : "(none)"
+					);
 				}
 			}
-			gst_object_unref(bus);
+		};
+
+		while (!sToken.stop_requested()) {
+			g_autoptr(GstMessage) msg = gst_bus_timed_pop_filtered(
+				bus,
+				100 * GST_MSECOND,
+				static_cast<GstMessageType>(
+					GST_MESSAGE_EOS | GST_MESSAGE_ERROR | GST_MESSAGE_WARNING |
+					GST_MESSAGE_STATE_CHANGED
+				)
+			);
+
+			if (!msg) { continue; }
+
+			switch (GST_MESSAGE_TYPE(msg)) {
+				case GST_MESSAGE_EOS: {
+					tImgTransLogInfo("End of stream reached.");
+					signals.onEOS();
+					break;
+				}
+				case GST_MESSAGE_ERROR: {
+					issueParser(msg, true);
+					break;
+				}
+				case GST_MESSAGE_WARNING: {
+					issueParser(msg, false);
+					break;
+				}
+				case GST_MESSAGE_STATE_CHANGED: {
+					if (GST_MESSAGE_SRC(msg) == GST_OBJECT(fixedPipe)) {
+						GstState oldState, newState;
+						gst_message_parse_state_changed(msg, &oldState, &newState, nullptr);
+						tImgTransLogInfo(
+							"Pipeline state changed from '{}' to '{}'",
+							gst_element_state_get_name(oldState),
+							gst_element_state_get_name(newState)
+						);
+						signals.onStateChanged(convGstState(oldState), convGstState(newState));
+					}
+
+					break;
+				}
+				default:
+					tImgTransLogWarn(
+						"Something weird happened, it should never goto busThread's default branch "
+						"..."
+					);  // Should never reach here
+			}
 		}
-	);
+	});
+
+	try {
+		passThruFuture.get();
+	} catch (const exception& e) {
+		throw;  // Rethrow to main thread
+	}
+
+	tImgTransLogInfo("Bus thread started successfully.");
+	return true;
 }
 
 bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
@@ -182,20 +265,20 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
 	bool         linkDynamic = false;
 	const gchar* srcType     = useFileSrc ? "filesrc" : "appsrc";
 
-	pipeline       = gst_pipeline_new("pipeline");
-	src            = gst_element_factory_make(srcType, "src");
-	parser         = gst_element_factory_make("h265parse", "parser");
-	bufferQueue    = gst_element_factory_make("queue", "bufferQueue");
-	decoder        = choosePrefDecoder(linkDynamic);
-	leakyQueue     = gst_element_factory_make("queue", "leakyQueue");
-	colorConv      = gst_element_factory_make("glcolorconvert", "colorConv");
-	uploader       = gst_element_factory_make("glupload", "uploader");
-	sinkCapsFilter = gst_element_factory_make("capsfilter", "sinkCapsFilter");
-	sink           = gst_element_factory_make("qml6glsink", "sink");
+	fixedPipe                 = gst_pipeline_new("pipeline");
+	fixedSrc                  = gst_element_factory_make(srcType, "src");
+	ElemRawPtr parser         = gst_element_factory_make("h265parse", "parser");
+	ElemRawPtr bufferQueue    = gst_element_factory_make("queue", "bufferQueue");
+	ElemRawPtr decoder        = choosePrefDecoder(linkDynamic);
+	ElemRawPtr leakyQueue     = gst_element_factory_make("queue", "leakyQueue");
+	ElemRawPtr colorConv      = gst_element_factory_make("glcolorconvert", "colorConv");
+	ElemRawPtr uploader       = gst_element_factory_make("glupload", "uploader");
+	ElemRawPtr sinkCapsFilter = gst_element_factory_make("capsfilter", "sinkCapsFilter");
+	fixedSink                 = gst_element_factory_make("qml6glsink", "sink");
 
 	if (anyFalse(
-			pipeline,
-			src,
+			fixedPipe,
+			fixedSrc,
 			parser,
 			decoder,
 			bufferQueue,
@@ -203,10 +286,10 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
 			colorConv,
 			leakyQueue,
 			sinkCapsFilter,
-			sink
+			fixedSink
 		)) {
-		for (auto elem : { pipeline,
-						   src,
+		for (auto elem : { fixedPipe,
+						   fixedSrc,
 						   parser,
 						   decoder,
 						   bufferQueue,
@@ -214,7 +297,7 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
 						   colorConv,
 						   leakyQueue,
 						   sinkCapsFilter,
-						   sink }) {
+						   fixedSink }) {
 			if (elem) { gst_object_unref(elem); }
 		}
 
@@ -224,8 +307,8 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
 	}
 
 	gst_bin_add_many(
-		GST_BIN(pipeline),
-		src,
+		GST_BIN(fixedPipe),
+		fixedSrc,
 		parser,
 		decoder,
 		bufferQueue,
@@ -233,7 +316,7 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
 		colorConv,
 		leakyQueue,
 		sinkCapsFilter,
-		sink,
+		fixedSink,
 		nullptr
 	);
 
@@ -243,11 +326,11 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
 	if (linkDynamic) {
 		if (anyFalse(
 				gst_element_link_many(
-					uploader, colorConv, sinkCapsFilter, leakyQueue, sink, nullptr
+					uploader, colorConv, sinkCapsFilter, leakyQueue, fixedSink, nullptr
 				),
-				gst_element_link_many(src, parser, bufferQueue, decoder, nullptr)
+				gst_element_link_many(fixedSrc, parser, bufferQueue, decoder, nullptr)
 			)) {
-			gst_object_unref(pipeline);
+			gst_object_unref(fixedPipe);
 			tImgTransLogCritical("{}", errMsg);
 			throw std::runtime_error(
 				errMsg.data()
@@ -258,7 +341,7 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
 		tImgTransLogTrace("Decoder will be linked dynamically");
 	} else {
 		if (!gst_element_link_many(
-				src,
+				fixedSrc,
 				parser,
 				bufferQueue,
 				decoder,
@@ -266,23 +349,23 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
 				colorConv,
 				sinkCapsFilter,
 				leakyQueue,
-				sink,
+				fixedSink,
 				nullptr
 			)) {
-			gst_object_unref(pipeline);
+			gst_object_unref(fixedPipe);
 			tImgTransLogCritical("{}", errMsg);
 			throw std::runtime_error(errMsg.data());
 		}
 		tImgTransLogTrace("Decoder will be linked statically");
 	}
 
-	g_object_set(sink, "sync", FALSE, "max-lateness", MAX_RENDER_DELAY, nullptr);
+	g_object_set(fixedSink, "sync", FALSE, "max-lateness", MAX_RENDER_DELAY, nullptr);
 	if (useFileSrc) {
-		g_object_set(src, "location", file_path, nullptr);
+		g_object_set(fixedSrc, "location", file_path, nullptr);
 	} else {
 		// 指定appsrc的caps属性('video/x-265')可能会导致h265parse在解析时更严格，从而导致播放卡死，因此暂不指定caps
 		g_object_set(
-			src,
+			fixedSrc,
 			"is-live",
 			TRUE,
 			"min-latency",
@@ -290,7 +373,9 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
 			"max-latency",
 			-1,  // Send at best effort
 			"max-bytes",
-			(guint64)(80 * 1000),  // Serial baud rate at 912600 (8N1), bandwidth is about 90KB/s
+			(guint64)(90 * 1000),  // Serial baud rate at 912600 (8N1), bandwidth is about 90KB/s
+			"do-timestamp",
+			TRUE,
 			"format",
 			GST_FORMAT_BYTES,
 			"stream-type",
@@ -301,9 +386,18 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
 			FALSE,
 			nullptr
 		);
+
+		// 根据Gstreamer文档的建议，打timestamp和live-source通常要设置'format'为'GST_FORMAT_TIME'，
+		// 但是考虑到发送端可能是透传，设置为'GST_FORMAT_BYTES'可能更合适。这个目前来看影响不大，如果后续
+		// 发现问题再调整。
+
+		// Using the appsrc
+		// Ref: https://gstreamer.freedesktop.org/documentation/application-development/advanced/pipeline-manipulation.html?gi-language=c#inserting-data-with-appsrc
 	}
 
-	g_object_set(parser, "config-interval", -1, nullptr);
+	// 开启disable-passthrough会强制parse解析每一帧，理论上可以降低缺/错帧带来的影响，但也可能增加CPU负担，目前看来是否开启对管线本身对稳定性影响不大
+	// config-interval最好设置为-1，让parse在遇到关键帧时重新配置(VPS, SPS, PPS)，这个选项对管线的稳定性与恢复能力影响较大
+	g_object_set(parser, "config-interval", -1, "disable-passthrough", FALSE, nullptr);
 	g_object_set(bufferQueue, "max-size-buffers", 2, "leaky", 0, nullptr);
 	g_object_set(
 		leakyQueue,
@@ -332,7 +426,9 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
 		gst_caps_from_string(sinkCapStr);  // This API's behavior is not stable under 1.20
 	g_object_set(sinkCapsFilter, "caps", caps, nullptr);
 
-	return true;
+	bool res = initBusThread();
+
+	return res;
 }
 
 TVidRender::TVidRender(const char* file_path)
@@ -355,24 +451,15 @@ TVidRender::TVidRender()
 
 TVidRender::~TVidRender()
 {
-	if (pipeline) {
-		gst_element_set_state(pipeline, GST_STATE_NULL);
-		gst_object_unref(pipeline);
-		pipeline = nullptr;
+	if (fixedPipe) {
+		gst_element_set_state(fixedPipe, GST_STATE_NULL);
+		gst_object_unref(fixedPipe);
+		fixedPipe = nullptr;
 	}
-
-	isRunning.store(false);
 }
 
 bool TVidRender::tryPushFrame(TVidRender::FramePtr frame)
 {
-	if (!isRunning.load()) {
-		tImgTransLogWarn("Attempted to push frame while renderer is not running.");
-		return false;
-	}
-
-	// tImgTransLogDebug("Start to push");
-
 	auto raw_vec_ptr = frame.release();
 
 	// 2. 使用 wrapped_full，并提供一个自定义的释放回调
@@ -390,31 +477,73 @@ bool TVidRender::tryPushFrame(TVidRender::FramePtr frame)
 	);
 
 	if (buffer) {
-		auto ret = gst_app_src_push_buffer(GST_APP_SRC(src), buffer);
-		if (ret != GST_FLOW_OK) {
-			tImgTransLogError("Failed to push buffer to appsrc, error: {}", gst_flow_get_name(ret));
-			return false;
+		// Push may success at GST_STATE_PAUSED or GST_STATE_PLAYING
+		auto ret = gst_app_src_push_buffer(GST_APP_SRC(fixedSrc), buffer);
+		if (ret == GST_FLOW_OK) {
+			lastPushSuccess.store(chrono::steady_clock::now());
+			return true;
+		}
+
+		if (ret <= GST_FLOW_ERROR) {
+			string errMsg = "Fatal error occured while trying to push frame buffer, flow return: " +
+							string(gst_flow_get_name(ret));
+
+			signals.onPipeError(IssueType::PUSH_FATAL, "appsrc", errMsg, "");
+			tImgTransLogCritical("{}", errMsg);
+		} else {
+			tImgTransLogWarn(
+				"Failed to push frame buffer, flow return: {}", gst_flow_get_name(ret)
+			);
 		}
 	}
 
-	// tImgTransLogDebug("Push is over");
-	return true;
+	return false;
 }
 
 bool TVidRender::play()
 {
-	GstStateChangeReturn ret = gst_element_set_state(pipeline, GST_STATE_PLAYING);
+	GstStateChangeReturn ret = gst_element_set_state(fixedPipe, GST_STATE_PLAYING);
 	if (ret == GST_STATE_CHANGE_FAILURE) {
 		tImgTransLogError("Failed to set pipeline to PLAYING state.");
 		return false;
 	}
 	tImgTransLogInfo("Pipeline set to PLAYING state.");
-	isRunning.store(true);
 	return true;
+}
+
+bool TVidRender::pause()
+{
+	GstStateChangeReturn ret = gst_element_set_state(fixedPipe, GST_STATE_PAUSED);
+	if (ret == GST_STATE_CHANGE_FAILURE) {
+		tImgTransLogError("Failed to set pipeline to PAUSED state.");
+		return false;
+	}
+	tImgTransLogInfo("Pipeline set to PAUSED state.");
+	return true;
+}
+
+TVidRender::StateType TVidRender::getCurrentState()
+{
+	GstState state;
+	gst_element_get_state(fixedPipe, &state, nullptr, 0);
+	return convGstState(state);
 }
 
 void TVidRender::linkSinkWidget(QQuickItem* widget)
 {
-	g_object_set(sink, "widget", widget, nullptr);
+	g_object_set(fixedSink, "widget", widget, nullptr);
+}
+
+void TVidRender::postTestError()
+{
+	if constexpr (conf::TDebugMode) {
+		if (!fixedPipe) { return; }
+
+		g_autoptr(GError) err =
+			g_error_new(GST_CORE_ERROR, GST_CORE_ERROR_FAILED, "Artificial test error");
+		GstMessage* msg =
+			gst_message_new_error(GST_OBJECT(fixedPipe), err, "Debugging jthread effect");
+		gst_bus_post(gst_element_get_bus(fixedPipe), msg);
+	}
 }
 }  // namespace gentau
