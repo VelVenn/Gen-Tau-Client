@@ -155,7 +155,7 @@ int main(int argc, char* argv[])
 	QGuiApplication app(argc, argv);
 	QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
 
-	auto renderer = make_shared<gentau::TVidRender>();
+	auto renderer = gentau::TVidRender::create();
 	auto sender   = make_shared<MockSender>("./res/raw_sintel_720p_stream.h265", renderer);
 
 	QQmlApplicationEngine engine;

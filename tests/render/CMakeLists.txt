@@ -38,3 +38,15 @@ gt_register_test(
     Qt6::Quick
     PkgConfig::GST
 )
+
+gt_register_test(
+  NAME rend-status-change 
+  SRC rend-status-change.cpp
+  USE_QT
+  QML_URI Render.StatusChange
+  QML_FILES qml/StatusTest.qml
+  DEPS
+    vid-render
+    Qt6::Quick
+    PkgConfig::GST
+)

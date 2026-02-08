@@ -7,7 +7,6 @@
 
 #include <gst/app/app.h>
 
-#include <gst/gstpad.h>
 #include <exception>
 #include <future>
 #include <stdexcept>
@@ -172,13 +171,13 @@ bool TVidRender::initBusThread()
 				auto domain = err->domain;
 
 				if (domain == GST_CORE_ERROR || domain == GST_LIBRARY_ERROR) {
-					iType = IssueType::ENGINE_INTERNAL;
+					iType = IssueType::PIPELINE_INTERNAL;
 				} else if (domain == GST_STREAM_ERROR) {
-					iType = IssueType::ENGINE_STREAM;
+					iType = IssueType::PIPELINE_STREAM;
 				} else if (domain == GST_RESOURCE_ERROR) {
-					iType = IssueType::ENGINE_RESOURCE;
+					iType = IssueType::PIPELINE_RESOURCE;
 				} else {
-					iType = IssueType::ENGINE_OTHER;
+					iType = IssueType::PIPELINE_OTHER;
 				}
 
 				if (asPipeErr) {
@@ -377,7 +376,7 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
 			"do-timestamp",
 			TRUE,
 			"format",
-			GST_FORMAT_BYTES,
+			GST_FORMAT_TIME,
 			"stream-type",
 			GST_APP_STREAM_TYPE_STREAM,
 			"emit-signals",
@@ -425,6 +424,8 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
 	g_autoptr(GstCaps) caps =
 		gst_caps_from_string(sinkCapStr);  // This API's behavior is not stable under 1.20
 	g_object_set(sinkCapsFilter, "caps", caps, nullptr);
+
+	tImgTransLogInfo("Pipeline initialized successfully, ready to start bus thread.");
 
 	bool res = initBusThread();
 
@@ -502,6 +503,11 @@ bool TVidRender::tryPushFrame(TVidRender::FramePtr frame)
 
 bool TVidRender::play()
 {
+	if (!pipeline()) {
+		tImgTransLogError("Play failed: Pipeline is not initialized.");
+		return false;
+	}
+
 	GstStateChangeReturn ret = gst_element_set_state(fixedPipe, GST_STATE_PLAYING);
 	if (ret == GST_STATE_CHANGE_FAILURE) {
 		tImgTransLogError("Failed to set pipeline to PLAYING state.");
@@ -513,12 +519,75 @@ bool TVidRender::play()
 
 bool TVidRender::pause()
 {
+	if (!pipeline()) {
+		tImgTransLogError("Pause failed: Pipeline is not initialized.");
+		return false;
+	}
+
 	GstStateChangeReturn ret = gst_element_set_state(fixedPipe, GST_STATE_PAUSED);
 	if (ret == GST_STATE_CHANGE_FAILURE) {
 		tImgTransLogError("Failed to set pipeline to PAUSED state.");
 		return false;
 	}
 	tImgTransLogInfo("Pipeline set to PAUSED state.");
+	return true;
+}
+
+bool TVidRender::reset()
+{
+	if(!pipeline()) {
+		tImgTransLogError("Reset failed: Pipeline is not initialized.");
+		return false;
+	}
+
+	GstStateChangeReturn ret = gst_element_set_state(fixedPipe, GST_STATE_NULL);
+	if (ret == GST_STATE_CHANGE_FAILURE) {
+		tImgTransLogError("Failed to reset pipeline");
+		return false;
+	}
+
+	if(!play()) {
+		tImgTransLogError("Failed to restart pipeline after reset");
+		return false;
+	}
+
+	tImgTransLogInfo("Pipeline reset success");
+	return true;
+}
+
+bool TVidRender::stopPipeline()
+{
+	if (!pipeline()) {
+		tImgTransLogError("Stop failed: Pipeline is not initialized.");
+		return false;
+	}
+
+	GstStateChangeReturn ret = gst_element_set_state(fixedPipe, GST_STATE_NULL);
+	if (ret == GST_STATE_CHANGE_FAILURE) {
+		tImgTransLogError("Failed to stop pipeline");
+		return false;
+	}
+	return true;
+}
+
+bool TVidRender::flush()
+{
+	if (!pipeline() || !src()) {
+		tImgTransLogError("Flush failed: Pipeline is not initialized.");
+		return false;
+	}
+
+	if (!gst_element_send_event(fixedSrc, gst_event_new_flush_start())) {
+		tImgTransLogError("Failed to send FLUSH START event.");
+		return false;
+	}
+
+	if (!gst_element_send_event(fixedSrc, gst_event_new_flush_stop(TRUE))) {
+		tImgTransLogError("Failed to send FLUSH STOP event.");
+		return false;
+	}
+
+	tImgTransLogInfo("Pipeline flushed successfully.");
 	return true;
 }
 
@@ -541,9 +610,16 @@ void TVidRender::postTestError()
 
 		g_autoptr(GError) err =
 			g_error_new(GST_CORE_ERROR, GST_CORE_ERROR_FAILED, "Artificial test error");
+
 		GstMessage* msg =
 			gst_message_new_error(GST_OBJECT(fixedPipe), err, "Debugging jthread effect");
-		gst_bus_post(gst_element_get_bus(fixedPipe), msg);
+
+		g_autoptr(GstBus) bus = gst_element_get_bus(fixedPipe);
+		gst_bus_post(bus, msg);  // bus -> no transfer, msg -> transfer full
+	} else {
+		constexpr auto errMsg =
+			"Calling TVidRender::postTestError() has no effect in non-debug builds."sv;
+		tImgTransLogWarn("{}", errMsg);
 	}
 }
 }  // namespace gentau

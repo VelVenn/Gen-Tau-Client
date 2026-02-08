@@ -36,17 +36,17 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	using FramePtr   = std::unique_ptr<std::vector<u8>>;
 	using ElemRawPtr = GstElement*;
 	using TimePoint  = std::chrono::steady_clock::time_point;
-	using Ptr        = std::unique_ptr<TVidRender>;
+	using Ptr        = std::shared_ptr<TVidRender>;
 
   public:
 	enum class IssueType : u32
 	{
 		UNKNOWN = 0,
 
-		ENGINE_INTERNAL,  // GStreamer pipeline internal error
-		ENGINE_RESOURCE,
-		ENGINE_STREAM,
-		ENGINE_OTHER,
+		PIPELINE_INTERNAL,  // GStreamer pipeline internal error
+		PIPELINE_RESOURCE,
+		PIPELINE_STREAM,
+		PIPELINE_OTHER,
 
 		PUSH_FATAL,  // Issues relate to pushing frames
 		PUSH_BUSY,
@@ -54,19 +54,19 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 		GENERIC  // TVidRender self detected issue, not directly from GStreamer
 	};
 
-	static std::string_view getIssueTypeLiteral(IssueType type)
+	static std::string_view getIssueTypeLiteral(IssueType type) noexcept
 	{
 		switch (type) {
 			case IssueType::UNKNOWN:
 				return "UNKNOWN";
-			case IssueType::ENGINE_INTERNAL:
-				return "ENGINE INTERNAL";
-			case IssueType::ENGINE_RESOURCE:
-				return "ENGINE RESOURCE";
-			case IssueType::ENGINE_STREAM:
-				return "ENGINE STREAM";
-			case IssueType::ENGINE_OTHER:
-				return "ENGINE OTHER";
+			case IssueType::PIPELINE_INTERNAL:
+				return "PIPELINE INTERNAL";
+			case IssueType::PIPELINE_RESOURCE:
+				return "PIPELINE RESOURCE";
+			case IssueType::PIPELINE_STREAM:
+				return "PIPELINE STREAM";
+			case IssueType::PIPELINE_OTHER:
+				return "PIPELINE OTHER";
 			case IssueType::PUSH_FATAL:
 				return "PUSH FATAL";
 			case IssueType::PUSH_BUSY:
@@ -81,18 +81,18 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	enum class StateType : u8
 	{
 		NULL_STATE = 0,
-		INITIALIZED,
+		READY,
 		PAUSED,
 		RUNNING
 	};
 
-	static StateType convGstState(GstState state)
+	static StateType convGstState(GstState state) noexcept
 	{
 		switch (state) {
 			case GST_STATE_NULL:
 				return StateType::NULL_STATE;
 			case GST_STATE_READY:
-				return StateType::INITIALIZED;
+				return StateType::READY;
 			case GST_STATE_PAUSED:
 				return StateType::PAUSED;
 			case GST_STATE_PLAYING:
@@ -102,19 +102,19 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 		}
 	}
 
-	static std::string_view getStateLiteral(StateType state)
+	static std::string_view getStateLiteral(StateType state) noexcept
 	{
 		switch (state) {
 			case StateType::NULL_STATE:
 				return "NULL STATE";
-			case StateType::INITIALIZED:
-				return "INITIALIZED";
+			case StateType::READY:
+				return "READY";
 			case StateType::PAUSED:
 				return "PAUSED";
 			case StateType::RUNNING:
 				return "RUNNING";
 			default:
-				return "UNKNOWN";
+				return "UNDEFINED";
 		}
 	}
 
@@ -204,12 +204,10 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	bool play();
 	bool pause();
 	bool reset();
+	bool flush();
+	bool stopPipeline();
 
 	StateType getCurrentState();
-
-  public:
-	bool run();
-	bool stop();
 
   public:
 	void linkSinkWidget(QQuickItem* widget);
@@ -223,7 +221,16 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 
   public:
 	TVidRender();
-	TVidRender(const char* file_path);
+	explicit TVidRender(const char* file_path);
+
+	static Ptr create(const char* file_path = nullptr)
+	{
+		if (file_path) {
+			return std::make_shared<TVidRender>(file_path);
+		} else {
+			return std::make_shared<TVidRender>();
+		}
+	}
 
 	~TVidRender();
 
