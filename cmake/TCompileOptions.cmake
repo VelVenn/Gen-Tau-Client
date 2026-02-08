@@ -10,7 +10,7 @@ if(GEN_TAU_USE_ASAN)
       -fno-optimize-sibling-calls
       -fsanitize-address-use-after-scope
       -fsanitize-recover=address
-      -O2
+      -O0
     )
     add_link_options(-fsanitize=address)
 
