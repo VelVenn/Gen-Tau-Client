@@ -106,8 +106,8 @@ GstElement* TVidRender::choosePrefDecoder(bool& isDynamic)
 		"d3d11h265dec",  // D3D11
 		"qsvh265dec",    // QuickSync (Intel)
 #elif defined(__APPLE__)
-		"vtdec_h265_hw",  // VideoToolbox H.265 hardware only
 		"vtdec_hw",       // General VideoToolbox hardware decoder
+		"vtdec_h265_hw",  // VideoToolbox H.265 hardware only
 		"vtdec_h265",     // VideoToolbox H.265 software
 		"vtdec",
 #endif
@@ -533,9 +533,11 @@ bool TVidRender::pause()
 	return true;
 }
 
+// reset() 和 stopPipeline() 是硬件资源级的重置，在MacOS上如果依赖vtdec_hw系列的硬件解码器，这两个API可能会导致严重错误 
+// 仅保证在Linux系统下的稳定性，其他平台应谨慎使用
 bool TVidRender::reset()
 {
-	if(!pipeline()) {
+	if (!pipeline()) {
 		tImgTransLogError("Reset failed: Pipeline is not initialized.");
 		return false;
 	}
@@ -546,7 +548,7 @@ bool TVidRender::reset()
 		return false;
 	}
 
-	if(!play()) {
+	if (!play()) {
 		tImgTransLogError("Failed to restart pipeline after reset");
 		return false;
 	}
@@ -586,6 +588,14 @@ bool TVidRender::flush()
 		tImgTransLogError("Failed to send FLUSH STOP event.");
 		return false;
 	}
+
+#ifdef __APPLE__
+	g_autoptr(GstCaps) currentCaps = nullptr;
+	g_object_get(fixedSrc, "caps", &currentCaps, nullptr);
+
+	// 重新设置它，这会欺骗解码器让它以为流变了，从而重置硬件会话
+	if (currentCaps) { g_object_set(fixedSrc, "caps", currentCaps, nullptr); }
+#endif
 
 	tImgTransLogInfo("Pipeline flushed successfully.");
 	return true;

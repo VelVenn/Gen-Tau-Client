@@ -147,6 +147,14 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 		sigslot::signal<IssueType, std::string, std::string, std::string> onPipeError;
 		sigslot::signal<IssueType, std::string, std::string, std::string> onPipeWarn;
 		sigslot::signal<StateType, StateType>                             onStateChanged;
+
+		~Signals()
+		{
+			onEOS.disconnect_all();
+			onPipeError.disconnect_all();
+			onPipeWarn.disconnect_all();
+			onStateChanged.disconnect_all();
+		}
 	};
 
 	struct SignalView
