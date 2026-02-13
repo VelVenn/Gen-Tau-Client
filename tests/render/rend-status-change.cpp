@@ -64,7 +64,7 @@ class RunningTask : public QRunnable
 
 int main(int argc, char *argv[])
 {
-	gst_init(&argc, &argv);
+	gentau::TVidRender::initContext(&argc, &argv);
 
 	// qputenv("QSG_RENDER_TIMING", "1");  // 启用渲染时间测量
 	// qputenv("QSG_RENDER_LOOP", "basic");                  // 强制基础渲染循环
@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
 		new RunningTask(vidRenderer), QQuickWindow::BeforeSynchronizingStage
 	);
 
-    return app.exec();
+	return app.exec();
 }
 
 #include "rend-status-change.moc"

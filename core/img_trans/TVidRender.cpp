@@ -6,9 +6,13 @@
 #include "utils/TLogical.hpp"
 
 #include <gst/app/app.h>
+#include <gst/app/gstappsrc.h>
+#include <gst/gst.h>
+#include <gst/gstenumtypes.h>
 
 #include <exception>
 #include <future>
+#include <mutex>
 #include <stdexcept>
 #include <stop_token>
 #include <string_view>
@@ -52,6 +56,24 @@ constexpr auto MAX_RENDER_DELAY = 25 * GST_MSECOND;
 // The float/sink process is very useful when initializing elements that will then be
 // placed under control of a parent. The floating ref keeps the object alive until it
 // is parented, and once the object is parented you can forget about it.
+
+static TVidRender::StateType convGstState(GstState state) noexcept
+{
+	using StateType = TVidRender::StateType;
+
+	switch (state) {
+		case GST_STATE_NULL:
+			return StateType::NULL_STATE;
+		case GST_STATE_READY:
+			return StateType::READY;
+		case GST_STATE_PAUSED:
+			return StateType::PAUSED;
+		case GST_STATE_PLAYING:
+			return StateType::RUNNING;
+		default:
+			return StateType::NULL_STATE;
+	}
+}
 
 void TVidRender::onDecoderPadAdded(GstElement* decoder, GstPad* new_pad, gpointer user_data)
 {
@@ -259,7 +281,7 @@ bool TVidRender::initBusThread()
 	return true;
 }
 
-bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
+bool TVidRender::initPipeElements(bool useFileSrc, const char* filePath)
 {
 	bool         linkDynamic = false;
 	const gchar* srcType     = useFileSrc ? "filesrc" : "appsrc";
@@ -360,7 +382,7 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
 
 	g_object_set(fixedSink, "sync", FALSE, "max-lateness", MAX_RENDER_DELAY, nullptr);
 	if (useFileSrc) {
-		g_object_set(fixedSrc, "location", file_path, nullptr);
+		g_object_set(fixedSrc, "location", filePath, nullptr);
 	} else {
 		// 指定appsrc的caps属性('video/x-265')可能会导致h265parse在解析时更严格，从而导致播放卡死，因此暂不指定caps
 		g_object_set(
@@ -432,11 +454,12 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* file_path)
 	return res;
 }
 
-TVidRender::TVidRender(const char* file_path)
+TVidRender::TVidRender(const char* _filePath, u64 _maxBufferBytes)
 {
 	// Check in compile-time
 	if constexpr (conf::TDebugMode) {
-		initPipeElements(true, file_path);
+		initPipeElements(true, _filePath);
+		maxBufferBytes.store(_maxBufferBytes);
 	} else {
 		constexpr auto errMsg =
 			"Calling TVidRender(const char* file_path) is not supported in release builds."sv;
@@ -445,9 +468,10 @@ TVidRender::TVidRender(const char* file_path)
 	}
 }
 
-TVidRender::TVidRender()
+TVidRender::TVidRender(u64 _maxBufferBytes)
 {
 	initPipeElements(false);
+	maxBufferBytes.store(_maxBufferBytes);
 }
 
 TVidRender::~TVidRender()
@@ -461,6 +485,23 @@ TVidRender::~TVidRender()
 
 bool TVidRender::tryPushFrame(TVidRender::FramePtr frame)
 {
+	if (!fixedPipe || !fixedSrc) {
+		tImgTransLogError("Push frame failed: Pipeline is not initialized.");
+		return false;
+	}
+
+	auto curBytes = gst_app_src_get_current_level_bytes(GST_APP_SRC(fixedSrc));
+	auto limit    = maxBufferBytes.load();
+	if (curBytes > limit) {
+		tImgTransLogWarn(
+			"Current buffer level '{}' bytes exceeds the maximum threshold of '{}' bytes, skipping "
+			"frame push.",
+			curBytes,
+			limit
+		);
+		return false;
+	}
+
 	auto raw_vec_ptr = frame.release();
 
 	// 2. 使用 wrapped_full，并提供一个自定义的释放回调
@@ -483,17 +524,9 @@ bool TVidRender::tryPushFrame(TVidRender::FramePtr frame)
 		if (ret == GST_FLOW_OK) {
 			lastPushSuccess.store(chrono::steady_clock::now());
 			return true;
-		}
-
-		if (ret <= GST_FLOW_ERROR) {
-			string errMsg = "Fatal error occured while trying to push frame buffer, flow return: " +
-							string(gst_flow_get_name(ret));
-
-			signals.onPipeError(IssueType::PUSH_FATAL, "appsrc", errMsg, "");
-			tImgTransLogCritical("{}", errMsg);
 		} else {
-			tImgTransLogWarn(
-				"Failed to push frame buffer, flow return: {}", gst_flow_get_name(ret)
+			tImgTransLogError(
+				"Failed to push buffer to appsrc, flow return: {}", gst_flow_get_name(ret)
 			);
 		}
 	}
@@ -533,7 +566,7 @@ bool TVidRender::pause()
 	return true;
 }
 
-// reset() 和 stopPipeline() 是硬件资源级的重置，在MacOS上如果依赖vtdec_hw系列的硬件解码器，这两个API可能会导致严重错误 
+// reset() 和 stopPipeline() 是硬件资源级的重置，在MacOS上如果依赖vtdec_hw系列的硬件解码器，这两个API可能会导致严重错误
 // 仅保证在Linux系统下的稳定性，其他平台应谨慎使用
 bool TVidRender::reset()
 {
@@ -611,6 +644,20 @@ TVidRender::StateType TVidRender::getCurrentState()
 void TVidRender::linkSinkWidget(QQuickItem* widget)
 {
 	g_object_set(fixedSink, "widget", widget, nullptr);
+}
+
+void TVidRender::initContext(int* argc, char** argv[])
+{
+	static once_flag initFlag;
+	call_once(initFlag, [argc, argv]() {
+		gst_init(argc, argv);
+		tImgTransLogInfo(
+			"GStreamer context initialized. Version: {}.{}.{}",
+			GST_VERSION_MAJOR,
+			GST_VERSION_MINOR,
+			GST_VERSION_MICRO
+		);
+	});
 }
 
 void TVidRender::postTestError()

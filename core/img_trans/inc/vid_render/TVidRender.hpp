@@ -2,8 +2,6 @@
 
 #include "utils/TTypeRedef.hpp"
 
-#include <gst/gst.h>
-
 #include "readerwritercircularbuffer.h"
 
 #include "sigslot/signal.hpp"
@@ -17,6 +15,15 @@
 #include <vector>
 
 class QQuickItem;
+
+extern "C"
+{
+	struct _GstElement;
+	struct _GstPad;
+	typedef struct _GstElement GstElement;
+	typedef struct _GstPad     GstPad;
+	typedef void*              gpointer;
+}
 
 namespace gentau {
 template<typename T>
@@ -86,22 +93,6 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 		RUNNING
 	};
 
-	static StateType convGstState(GstState state) noexcept
-	{
-		switch (state) {
-			case GST_STATE_NULL:
-				return StateType::NULL_STATE;
-			case GST_STATE_READY:
-				return StateType::READY;
-			case GST_STATE_PAUSED:
-				return StateType::PAUSED;
-			case GST_STATE_PLAYING:
-				return StateType::RUNNING;
-			default:
-				return StateType::NULL_STATE;
-		}
-	}
-
 	static std::string_view getStateLiteral(StateType state) noexcept
 	{
 		switch (state) {
@@ -130,6 +121,35 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 		auto connect(Args&&... args)
 		{
 			return signal.connect(std::forward<Args>(args)...);
+		}
+
+		template<typename... Args>
+		auto disconnect(Args&&... args)
+		{
+			return signal.disconnect(std::forward<Args>(args)...);
+		}
+
+		// Connect to the signal
+		template<typename... Args>
+		auto operator()(Args&&... args)
+		{
+			return signal.connect(std::forward<Args>(args)...);
+		}
+
+		// Connect to the signal
+		template<typename CallableType>
+		auto& operator+=(CallableType&& slot)
+		{
+			signal.connect(std::forward<CallableType>(slot));
+			return *this;
+		}
+
+		// Disconnect from the signal
+		template<typename CallableType>
+		auto& operator-=(CallableType&& slot)
+		{
+			signal.disconnect(std::forward<CallableType>(slot));
+			return *this;
 		}
 
 		SignalWrapper(T& sig) : signal(sig) {}
@@ -186,7 +206,15 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 
   private:
 	std::atomic<TimePoint>    lastPushSuccess = TimePoint::min();
+	std::atomic<u64>          maxBufferBytes  = 80000;  // 80 KB
 	std::chrono::milliseconds feedTimeout     = std::chrono::milliseconds(50);
+
+  public:
+	u64  getMaxBufferBytes() const { return maxBufferBytes.load(); }
+	void setMaxBufferBytes(u64 bytes) { maxBufferBytes.store(bytes); }
+
+  public:
+	TimePoint getLastPushSuccessTime() const { return lastPushSuccess.load(); }
 
   private:
 	std::jthread busThread;
@@ -228,17 +256,21 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	void postTestError();
 
   public:
-	TVidRender();
-	explicit TVidRender(const char* file_path);
+	explicit TVidRender(u64 _maxBufferBytes = 80000);
+	explicit TVidRender(const char* file_path, u64 _maxBufferBytes = 80000);
 
-	static Ptr create(const char* file_path = nullptr)
+	static Ptr create(const char* file_path = nullptr, u64 _maxBufferBytes = 80000)
 	{
 		if (file_path) {
-			return std::make_shared<TVidRender>(file_path);
+			return std::make_shared<TVidRender>(file_path, _maxBufferBytes);
 		} else {
-			return std::make_shared<TVidRender>();
+			return std::make_shared<TVidRender>(_maxBufferBytes);
 		}
 	}
+
+	static Ptr create(u64 _maxBufferBytes) { return std::make_shared<TVidRender>(_maxBufferBytes); }
+
+	static void initContext(int* argc, char** argv[]);
 
 	~TVidRender();
 

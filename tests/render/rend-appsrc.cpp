@@ -50,27 +50,28 @@ void MockSender::run()
 		return;
 	}
 
-	renderer->getSignalView().onStateChanged.connect([](gentau::TVidRender::StateType oState,
-														gentau::TVidRender::StateType nState) {
-		tImgTransLogInfo(
-			"Sender checked: Renderer state changed from {} to {}",
-			gentau::TVidRender::getStateLiteral(oState),
-			gentau::TVidRender::getStateLiteral(nState)
-		);
-	});
+	renderer->getSignalView().onStateChanged +=
+		[](gentau::TVidRender::StateType oState, gentau::TVidRender::StateType nState) {
+			tImgTransLogInfo(
+				"Sender checked: Renderer state changed from {} to {}",
+				gentau::TVidRender::getStateLiteral(oState),
+				gentau::TVidRender::getStateLiteral(nState)
+			);
+		};
 
-	renderer->getSignalView().onPipeError.connect([](gentau::TVidRender::IssueType iType,
-													 const string&                 src,
-													 const string&                 msg,
-													 const string&                 debug) {
+	renderer->getSignalView().onPipeError += [](gentau::TVidRender::IssueType iType,
+												const string&                 src,
+												const string&                 msg,
+												const string&                 debug) {
 		tImgTransLogError(
-			"Sender checked: Renderer Pipe Error | Type: {} | Source: {} | Message: {} | Debug: {}",
+			"Sender checked: Renderer Pipe Error | Type: {} | Source: {} | Message: {} | "
+			"Debug: {}",
 			gentau::TVidRender::getIssueTypeLiteral(iType),
 			src,
 			msg,
 			debug
 		);
-	});
+	}; 
 
 	renderer->play();
 
@@ -85,6 +86,7 @@ void MockSender::run()
 
 		int postErrOrNot = 0;
 		int postErrInv   = 50;
+		tImgTransLogInfo("Mock sender started");
 
 		while (!stoken.stop_requested() &&
 			   (vidSrc.read(reinterpret_cast<char*>(buffer.data()), bufferSize) ||
@@ -107,11 +109,17 @@ void MockSender::run()
 
 			if (++postErrOrNot % postErrInv == 0) { renderer->postTestError(); }
 
-			renderer->tryPushFrame(std::move(frameData));
+			if (renderer->tryPushFrame(std::move(frameData))) {
+				// 推送成功，模拟 90KB/s 的节奏
+				// 10K / 90K = 0.111s = 111ms
+				this_thread::sleep_for(chrono::milliseconds(111));
+			} else {
+				this_thread::sleep_for(chrono::milliseconds(10));
+			}
 			// this_thread::sleep_for(chrono::milliseconds(33));
 			// tImgTransLogDebug("Push down, trying to push next");
 		}
-		cout << "Sender thread finished." << endl;
+		tImgTransLogInfo("Mock sender stopped");
 	});
 }
 
@@ -134,9 +142,9 @@ class RunningTask : public QRunnable
 
 int main(int argc, char* argv[])
 {
-	gst_init(&argc, &argv);
+	gentau::TVidRender::initContext(&argc, &argv);
 
-	// qputenv("QSG_RENDER_TIMING", "1");  // 启用渲染时间测量
+	// qputenv("QSG_RENDER_TIMING", "1");                    // 启用渲染时间测量
 	// qputenv("QSG_RENDER_LOOP", "basic");                  // 强制基础渲染循环
 	qputenv("__GL_SYNC_TO_VBLANK", "0");                  // 禁用NVIDIA VSync
 	qputenv("vblank_mode", "0");                          // 禁用Mesa VSync
@@ -155,7 +163,7 @@ int main(int argc, char* argv[])
 	QGuiApplication app(argc, argv);
 	QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
 
-	auto renderer = gentau::TVidRender::create();
+	auto renderer = gentau::TVidRender::create(80 * 1024);
 	auto sender   = make_shared<MockSender>("./res/raw_sintel_720p_stream.h265", renderer);
 
 	QQmlApplicationEngine engine;

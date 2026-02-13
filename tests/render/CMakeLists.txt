@@ -22,7 +22,7 @@ gt_register_test(
   QML_URI Render.Filesrc
   QML_FILES qml/RendTest.qml
   DEPS
-    vid-render
+    img-trans
     Qt6::Quick
     PkgConfig::GST
 )
@@ -34,9 +34,8 @@ gt_register_test(
   QML_URI Render.Appsrc
   QML_FILES qml/RendTest.qml
   DEPS
-    vid-render
+    img-trans
     Qt6::Quick
-    PkgConfig::GST
 )
 
 gt_register_test(
@@ -46,7 +45,6 @@ gt_register_test(
   QML_URI Render.StatusChange
   QML_FILES qml/StatusTest.qml
   DEPS
-    vid-render
+    img-trans
     Qt6::Quick
-    PkgConfig::GST
 )
