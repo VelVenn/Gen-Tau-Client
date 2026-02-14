@@ -4,7 +4,7 @@
 
 #include "conf/version.hpp"
 #include "utils/TLog.hpp"
-#include "vid_render/TVidRender.hpp"
+#include "img_trans/vid_render/TVidRender.hpp"
 
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>

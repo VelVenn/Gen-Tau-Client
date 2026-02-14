@@ -1,6 +1,6 @@
 #include <gst/gst.h>
 #include <gst/gstobject.h>
-#include "vid_render/TVidRender.hpp"
+#include "img_trans/vid_render/TVidRender.hpp"
 
 using namespace gentau;
 

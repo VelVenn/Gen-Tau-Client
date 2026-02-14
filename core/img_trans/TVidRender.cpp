@@ -1,4 +1,4 @@
-#include "vid_render/TVidRender.hpp"
+#include "img_trans/vid_render/TVidRender.hpp"
 
 #include "conf/version.hpp"
 
