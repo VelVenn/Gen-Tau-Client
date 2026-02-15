@@ -5,4 +5,5 @@ gt_register_mod(
   DEPS
     conf
     spdlog::spdlog
+    Pal::Sigslot
 )

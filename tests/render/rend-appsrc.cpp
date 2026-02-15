@@ -3,8 +3,8 @@
 #include <cstdint>
 
 #include "conf/version.hpp"
-#include "utils/TLog.hpp"
 #include "img_trans/vid_render/TVidRender.hpp"
+#include "utils/TLog.hpp"
 
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
@@ -50,7 +50,7 @@ void MockSender::run()
 		return;
 	}
 
-	renderer->getSignalView().onStateChanged +=
+	renderer->onStateChanged +=
 		[](gentau::TVidRender::StateType oState, gentau::TVidRender::StateType nState) {
 			tImgTransLogInfo(
 				"Sender checked: Renderer state changed from {} to {}",
@@ -59,10 +59,10 @@ void MockSender::run()
 			);
 		};
 
-	renderer->getSignalView().onPipeError += [](gentau::TVidRender::IssueType iType,
-												const string&                 src,
-												const string&                 msg,
-												const string&                 debug) {
+	renderer->onPipeError += [](gentau::TVidRender::IssueType iType,
+								const string&                 src,
+								const string&                 msg,
+								const string&                 debug) {
 		tImgTransLogError(
 			"Sender checked: Renderer Pipe Error | Type: {} | Source: {} | Message: {} | "
 			"Debug: {}",
@@ -71,7 +71,7 @@ void MockSender::run()
 			msg,
 			debug
 		);
-	}; 
+	};
 
 	renderer->play();
 

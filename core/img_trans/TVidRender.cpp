@@ -203,7 +203,7 @@ bool TVidRender::initBusThread()
 				}
 
 				if (asPipeErr) {
-					signals.onPipeError(iType, errSrc, err->message, debugInfo ? debugInfo : "");
+					onPipeError(iType, errSrc, err->message, debugInfo ? debugInfo : "");
 
 					tImgTransLogError(
 						"Render Engine error: {} | Debug info : {}",
@@ -211,7 +211,7 @@ bool TVidRender::initBusThread()
 						debugInfo ? debugInfo : "(none)"
 					);
 				} else {
-					signals.onPipeWarn(iType, errSrc, err->message, debugInfo ? debugInfo : "");
+					onPipeWarn(iType, errSrc, err->message, debugInfo ? debugInfo : "");
 
 					tImgTransLogWarn(
 						"Render Engine warning: {} | Debug info : {}",
@@ -237,7 +237,7 @@ bool TVidRender::initBusThread()
 			switch (GST_MESSAGE_TYPE(msg)) {
 				case GST_MESSAGE_EOS: {
 					tImgTransLogInfo("End of stream reached.");
-					signals.onEOS();
+					onEOS();
 					break;
 				}
 				case GST_MESSAGE_ERROR: {
@@ -257,7 +257,7 @@ bool TVidRender::initBusThread()
 							gst_element_state_get_name(oldState),
 							gst_element_state_get_name(newState)
 						);
-						signals.onStateChanged(convGstState(oldState), convGstState(newState));
+						onStateChanged(convGstState(oldState), convGstState(newState));
 					}
 
 					break;
@@ -392,9 +392,9 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* filePath)
 			"min-latency",
 			0,  // No latency, push frames as soon as possible
 			"max-latency",
-			-1,  // Send at best effort
-			"max-bytes",
-			(guint64)(90 * 1000),  // Serial baud rate at 912600 (8N1), bandwidth is about 90KB/s
+			-1,                     // Send at best effort
+			"max-bytes",            // No effect when emit-signals is FALSE
+			(guint64)(256 * 1024),  // VT03 Module -> 1080p 60FPS max
 			"do-timestamp",
 			TRUE,
 			"format",

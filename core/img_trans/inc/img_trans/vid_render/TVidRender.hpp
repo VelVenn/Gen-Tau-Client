@@ -1,8 +1,7 @@
 #pragma once
 
 #include "utils/TTypeRedef.hpp"
-
-#include "readerwritercircularbuffer.h"
+#include "utils/TSignal.hpp"
 
 #include "sigslot/signal.hpp"
 
@@ -26,17 +25,6 @@ extern "C"
 }
 
 namespace gentau {
-template<typename T>
-struct IsSigslotSignal : std::false_type
-{};
-
-template<typename... Args>
-struct IsSigslotSignal<sigslot::signal<Args...>> : std::true_type
-{};
-
-template<typename T>
-concept SigslotSignal = IsSigslotSignal<T>::value;
-
 class TVidRender : public std::enable_shared_from_this<TVidRender>
 {
   public:
@@ -109,104 +97,20 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 		}
 	}
 
-  public:
-	template<SigslotSignal T>
-	class SignalWrapper
-	{
-	  private:
-		T& signal;
-
-	  public:
-		template<typename... Args>
-		auto connect(Args&&... args)
-		{
-			return signal.connect(std::forward<Args>(args)...);
-		}
-
-		template<typename... Args>
-		auto disconnect(Args&&... args)
-		{
-			return signal.disconnect(std::forward<Args>(args)...);
-		}
-
-		// Connect to the signal
-		template<typename... Args>
-		auto operator()(Args&&... args)
-		{
-			return signal.connect(std::forward<Args>(args)...);
-		}
-
-		// Connect to the signal
-		template<typename CallableType>
-		auto& operator+=(CallableType&& slot)
-		{
-			signal.connect(std::forward<CallableType>(slot));
-			return *this;
-		}
-
-		// Disconnect from the signal
-		template<typename CallableType>
-		auto& operator-=(CallableType&& slot)
-		{
-			signal.disconnect(std::forward<CallableType>(slot));
-			return *this;
-		}
-
-		SignalWrapper(T& sig) : signal(sig) {}
-		~SignalWrapper() = default;
-
-		SignalWrapper(const SignalWrapper&)            = delete;  // Forbid copy or move
-		SignalWrapper& operator=(const SignalWrapper&) = delete;
-		SignalWrapper(SignalWrapper&&)                 = delete;
-		SignalWrapper& operator=(SignalWrapper&&)      = delete;
-	};
-
-	struct Signals
-	{
-		sigslot::signal<>                                                 onEOS;
-		sigslot::signal<IssueType, std::string, std::string, std::string> onPipeError;
-		sigslot::signal<IssueType, std::string, std::string, std::string> onPipeWarn;
-		sigslot::signal<StateType, StateType>                             onStateChanged;
-
-		~Signals()
-		{
-			onEOS.disconnect_all();
-			onPipeError.disconnect_all();
-			onPipeWarn.disconnect_all();
-			onStateChanged.disconnect_all();
-		}
-	};
-
-	struct SignalView
-	{
-		SignalWrapper<decltype(Signals::onEOS)>          onEOS;
-		SignalWrapper<decltype(Signals::onPipeError)>    onPipeError;
-		SignalWrapper<decltype(Signals::onPipeWarn)>     onPipeWarn;
-		SignalWrapper<decltype(Signals::onStateChanged)> onStateChanged;
-	};
-
-  public:
-	SignalView getSignalView()
-	{
-		return SignalView{
-			{ signals.onEOS },
-			{ signals.onPipeError },
-			{ signals.onPipeWarn },
-			{ signals.onStateChanged },
-		};
-	}
-
   private:
 	GstElement* fixedPipe;  // Should not changed the pointer after init
 	GstElement* fixedSrc;   // Should not changed the pointer after init
 	GstElement* fixedSink;  // Should not changed the pointer after init
-
-	Signals  signals;
-	Signals& getSignals() { return signals; }
+	
+  public:
+	TSignal<TVidRender> onEOS; 
+	TSignal<TVidRender, IssueType, std::string, std::string, std::string> onPipeError;
+	TSignal<TVidRender, IssueType, std::string, std::string, std::string> onPipeWarn;
+	TSignal<TVidRender, StateType, StateType> onStateChanged;
 
   private:
 	std::atomic<TimePoint>    lastPushSuccess = TimePoint::min();
-	std::atomic<u64>          maxBufferBytes  = 80000;  // 80 KB
+	std::atomic<u64>          maxBufferBytes  = 262144;  // Default to 256 KB
 	std::chrono::milliseconds feedTimeout     = std::chrono::milliseconds(50);
 
   public:
@@ -256,10 +160,10 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	void postTestError();
 
   public:
-	explicit TVidRender(u64 _maxBufferBytes = 80000);
-	explicit TVidRender(const char* file_path, u64 _maxBufferBytes = 80000);
+	explicit TVidRender(u64 _maxBufferBytes = 262144);  // Default to 256 KB
+	explicit TVidRender(const char* file_path, u64 _maxBufferBytes = 262144);
 
-	static Ptr create(const char* file_path = nullptr, u64 _maxBufferBytes = 80000)
+	static Ptr create(const char* file_path = nullptr, u64 _maxBufferBytes = 262144)
 	{
 		if (file_path) {
 			return std::make_shared<TVidRender>(file_path, _maxBufferBytes);

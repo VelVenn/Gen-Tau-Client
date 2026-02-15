@@ -1,11 +1,12 @@
+file(GLOB SRC_FILES CONFIGURE_DEPENDS "*.cpp")
+
 gt_register_mod(
   NAME img-trans
   TYPE STATIC
-  SRC TVidRender.cpp
+  SRC ${SRC_FILES}
   DEPS
     utils
     readerwriterqueue
-    Pal::Sigslot 
 
     PRIVATE
       conf
