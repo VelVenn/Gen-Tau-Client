@@ -2,3 +2,13 @@ leak:libfontconfig
 leak:libqgtk3
 leak:libpango
 # leak:libgobject
+
+leak:libcuda.so
+leak:libvulkan.so
+leak:libtheoraenc.so
+leak:libgallium
+leak:libEGL_mesa
+leak:libhwy.so
+leak:libpostproc.so
+leak:libwayland-client.so
+leak:QWaylandEglClientBufferIntegration
