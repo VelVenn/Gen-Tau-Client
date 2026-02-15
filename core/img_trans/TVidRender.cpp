@@ -137,11 +137,10 @@ GstElement* TVidRender::choosePrefDecoder(bool& isDynamic)
 	};
 
 	for (auto name : candidates) {
-		GstElementFactory* factory = gst_element_factory_find(name);
+		g_autoptr(GstElementFactory) factory = gst_element_factory_find(name);
 		if (factory) {
 			// Further verify for gstreamer plugin blacklist
 			GstElement* element = gst_element_factory_create(factory, "decoder");
-			gst_object_unref(GST_OBJECT(factory));
 
 			if (element) {
 				tImgTransLogTrace("Selected H.265 Decoder: '{}'", name);
