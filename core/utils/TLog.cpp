@@ -1,13 +1,15 @@
 #include "utils/TLog.hpp"
 
+#include <chrono>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "spdlog/async.h"
 #include "spdlog/common.h"
-#include "spdlog/logger.h"
-#include "spdlog/sinks/rotating_file_sink.h"
+#include "spdlog/fmt/chrono.h"
+#include "spdlog/fmt/fmt.h"
+#include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 
 namespace spd = spdlog;
@@ -24,11 +26,14 @@ static vector<spd::sink_ptr> createSinks()
 		spd::init_thread_pool(8192, 1);
 
 		if constexpr (conf::TLogToFile) {
-			auto file_sink = make_shared<spd::sinks::rotating_file_sink_mt>(
-				"logs/gt_framework.log",
-				1024 * 1024 * 10,  // 10 MB
-				5                  // 5 files
-			);
+			auto now_time_t = chrono::zoned_time<chrono::seconds>{
+				chrono::current_zone(), chrono::floor<chrono::seconds>(chrono::system_clock::now())
+			};
+
+			auto local_time = now_time_t.get_local_time();
+			auto log_file   = fmt::format("logs/gt_{:%Y%M%d_%H%M%S}.log", local_time);
+
+			auto file_sink = make_shared<spd::sinks::basic_file_sink_mt>(log_file);
 
 			file_sink->set_level(spd::level::trace);
 			s_list.push_back(file_sink);
