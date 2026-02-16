@@ -1,9 +1,7 @@
 #pragma once
 
-#include "utils/TTypeRedef.hpp"
 #include "utils/TSignal.hpp"
-
-#include "sigslot/signal.hpp"
+#include "utils/TTypeRedef.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -31,7 +29,7 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	using FramePtr   = std::unique_ptr<std::vector<u8>>;
 	using ElemRawPtr = GstElement*;
 	using TimePoint  = std::chrono::steady_clock::time_point;
-	using Ptr        = std::shared_ptr<TVidRender>;
+	using SharedPtr  = std::shared_ptr<TVidRender>;
 
   public:
 	enum class IssueType : u32
@@ -101,23 +99,22 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	GstElement* fixedPipe;  // Should not changed the pointer after init
 	GstElement* fixedSrc;   // Should not changed the pointer after init
 	GstElement* fixedSink;  // Should not changed the pointer after init
-	
+
   public:
-	TSignal<TVidRender> onEOS; 
+	TSignal<TVidRender>                                                   onEOS;
 	TSignal<TVidRender, IssueType, std::string, std::string, std::string> onPipeError;
 	TSignal<TVidRender, IssueType, std::string, std::string, std::string> onPipeWarn;
-	TSignal<TVidRender, StateType, StateType> onStateChanged;
+	TSignal<TVidRender, StateType, StateType>                             onStateChanged;
 
   private:
-	std::atomic<TimePoint>    lastPushSuccess = TimePoint::min();
-	std::atomic<u64>          maxBufferBytes  = 262144;  // Default to 256 KB
-	std::chrono::milliseconds feedTimeout     = std::chrono::milliseconds(50);
+	std::atomic<TimePoint> lastPushSuccess = TimePoint::min();
+	std::atomic<u64>       maxBufferBytes  = 262'144;  // Default to 256 KB
 
   public:
-	u64  getMaxBufferBytes() const { return maxBufferBytes.load(); }
-	void setMaxBufferBytes(u64 bytes) { maxBufferBytes.store(bytes); }
+	u64  getMaxBufferBytes() const { return maxBufferBytes.load(); }    // MT-SAFE
+	void setMaxBufferBytes(u64 bytes) { maxBufferBytes.store(bytes); }  // MT-SAFE
 
-  public:
+	// MT-SAFE
 	TimePoint getLastPushSuccessTime() const { return lastPushSuccess.load(); }
 
   private:
@@ -141,12 +138,51 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	bool tryPushFrame(FramePtr frame);
 
   public:
+	/** 
+	 * @brief: Let the pipeline start playing. 
+	 * 
+	 * @note: NOT MT-SAFE! Strongly recommend to call this from the main thread 
+	 * 		  or the thread that created the TVidRender instance.
+	 */
 	bool play();
-	bool pause();
-	bool reset();
-	bool flush();
-	bool stopPipeline();
 
+	/**
+	 * @brief: Pause the pipeline.
+	 * 
+	 * @note: NOT MT-SAFE! Strongly recommend to call this from the main thread 
+	 * 		  or the thread that created the TVidRender instance.
+	 */
+	bool pause();
+
+	/**
+	 * @brief: Restart the pipeline.
+	 * 
+	 * @note: NOT MT-SAFE! Strongly recommend to call this from the main thread 
+	 * 		  or the thread that created the TVidRender instance. This method 
+	 *        will release all the resources to the hardware level. May cause 
+	 *        FATAL error on OS X.  
+	 */
+	bool restart();
+
+	/**
+	 * @brief: Flush the pipeline. Will only clear the data in the pipeline. 
+	 * 
+	 * @note: NOT MT-SAFE! Strongly recommend to call this from the main thread 
+	 * 		  or the thread that created the TVidRender instance.
+	 */
+	bool flush();
+
+	/**
+	 * @brief: Stop the pipeline. Will set pipeline to NULL state and release all resources. 
+	 * 
+	 * @note: NOT MT-SAFE! Strongly recommend to call this from the main thread 
+	 * 		  or the thread that created the TVidRender instance. This method 
+	 *        will release all the resources to the hardware level. May cause 
+	 *        FATAL error on OS X.  
+	 */
+	bool stop();
+
+	// MT-SAFE
 	StateType getCurrentState();
 
   public:
@@ -160,10 +196,18 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	void postTestError();
 
   public:
-	explicit TVidRender(u64 _maxBufferBytes = 262144);  // Default to 256 KB
-	explicit TVidRender(const char* file_path, u64 _maxBufferBytes = 262144);
+	explicit TVidRender(u64 _maxBufferBytes = 262'144);  // Default to 256 KB
+	explicit TVidRender(const char* file_path, u64 _maxBufferBytes = 262'144);
 
-	static Ptr create(const char* file_path = nullptr, u64 _maxBufferBytes = 262144)
+	/** 
+	 * @brief: create a shared pointer to TVidRender instance. 
+	 *
+	 * @throws: std::runtime_error if the pipeline initialization failed, or 
+	 *          if file_path is provided in non-Debug builds.
+	 */
+	[[nodiscard("Should not ignored the created TVidRender::SharedPtr")]] static SharedPtr create(
+		const char* file_path = nullptr, u64 _maxBufferBytes = 262'144
+	)
 	{
 		if (file_path) {
 			return std::make_shared<TVidRender>(file_path, _maxBufferBytes);
@@ -172,7 +216,17 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 		}
 	}
 
-	static Ptr create(u64 _maxBufferBytes) { return std::make_shared<TVidRender>(_maxBufferBytes); }
+	/** 
+	 * @brief: create a shared pointer to TVidRender instance.
+	 *
+	 * @throws: std::runtime_error if the pipeline initialization failed.
+	 */
+	[[nodiscard("Should not ignored the created TVidRender::SharedPtr")]] static SharedPtr create(
+		u64 _maxBufferBytes
+	)
+	{
+		return std::make_shared<TVidRender>(_maxBufferBytes);
+	}
 
 	static void initContext(int* argc, char** argv[]);
 

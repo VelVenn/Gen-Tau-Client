@@ -1,7 +1,7 @@
 #include <qquickwindow.h>
 
-#include "utils/TLog.hpp"
 #include "img_trans/vid_render/TVidRender.hpp"
+#include "utils/TLog.hpp"
 
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
@@ -39,11 +39,11 @@ class VideoController : public QObject
 	}
 	Q_INVOKABLE void reset()
 	{
-		if (m_renderer) m_renderer->reset();
+		if (m_renderer) m_renderer->restart();
 	}
 	Q_INVOKABLE void stop()
 	{
-		if (m_renderer) m_renderer->stopPipeline();
+		if (m_renderer) m_renderer->stop();
 	}
 
   private:

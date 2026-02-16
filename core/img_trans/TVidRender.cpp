@@ -567,7 +567,7 @@ bool TVidRender::pause()
 
 // reset() 和 stopPipeline() 是硬件资源级的重置，在MacOS上如果依赖vtdec_hw系列的硬件解码器，这两个API可能会导致严重错误
 // 仅保证在Linux系统下的稳定性，其他平台应谨慎使用
-bool TVidRender::reset()
+bool TVidRender::restart()
 {
 	if (!pipeline()) {
 		tImgTransLogError("Reset failed: Pipeline is not initialized.");
@@ -589,7 +589,7 @@ bool TVidRender::reset()
 	return true;
 }
 
-bool TVidRender::stopPipeline()
+bool TVidRender::stop()
 {
 	if (!pipeline()) {
 		tImgTransLogError("Stop failed: Pipeline is not initialized.");
