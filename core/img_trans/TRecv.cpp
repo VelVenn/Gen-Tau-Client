@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <cerrno>
 
+#include <array>
 #include <future>
 #include <stop_token>
 #include <system_error>
@@ -45,34 +46,64 @@ int TRecv::start()
 	promise<i32> threadErrPassThru;
 	auto         passThruFuture = threadErrPassThru.get_future();
 
-	recvThread =
-		jthread([this, passThru = std::move(threadErrPassThru)](stop_token sToken) mutable {
-			if (::setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, &kRecvBufferSize, sizeof(i32)) < 0) {
-				tImgTransLogError(
-					"Failed to set socket kernel receive buffer size, error: {}",
-					error_code(errno, system_category()).message()
-				);
-				passThru.set_value(errno);
-				return;
+	recvThread = jthread([this,
+						  passThru = std::move(threadErrPassThru)](stop_token sToken) mutable {
+		if (::setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, &kRecvBufferSize, sizeof(i32)) < 0) {
+			tImgTransLogError(
+				"Failed to set socket kernel receive buffer size, error: {}",
+				error_code(errno, system_category()).message()
+			);
+			passThru.set_value(errno);
+			return;
+		}
+
+		if (::setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &kRecvTimeout, sizeof(timeval)) < 0) {
+			tImgTransLogError(
+				"Failed to set socket receive timeout, error: {}",
+				error_code(errno, system_category()).message()
+			);
+			passThru.set_value(errno);
+			return;
+		}
+
+		passThru.set_value(0);
+
+		array<u8, MTU_LEN> recvBuffer{};
+		memset(&recvBuffer, 0, MTU_LEN);
+
+		while (!sToken.stop_requested()) {
+			auto ret = ::recv(sockfd, recvBuffer.data(), MTU_LEN, 0);
+
+			if (ret > 0) {
+				lastRecvTime.store(chrono::steady_clock::now());
+
+				auto header = TReassembly::Header::parse(recvBuffer);
+				if (header) {
+					tImgTransLogDebug(
+						"Received packet - frameIdx: {}, secIdx: {}, frameLen: {}",
+						header->frameIdx,
+						header->secIdx,
+						header->frameLen
+					);
+				} else {
+					tImgTransLogWarn("Received packet too small to contain header, size: {}", ret);
+				}
+			} else {
+				if (errno == EAGAIN || errno == EWOULDBLOCK) {
+					// Do some periodic task...
+					continue;  // Timeout, just try again
+				} else {
+					tImgTransLogError(
+						"Error receiving data, error: {}",
+						error_code(errno, system_category()).message()
+					);
+					break;
+				}
 			}
+		}
 
-			if (::setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &kRecvTimeout, sizeof(timeval)) < 0) {
-				tImgTransLogError(
-					"Failed to set socket receive timeout, error: {}",
-					error_code(errno, system_category()).message()
-				);
-				passThru.set_value(errno);
-				return;
-			}
-
-			passThru.set_value(0);
-
-			while (!sToken.stop_requested()) {
-				// Do something ...
-			}
-
-			tImgTransLogTrace("UDP Receive thread stopped");
-		});
+		tImgTransLogTrace("UDP Receive thread stopped");
+	});
 
 	auto threadErr = passThruFuture.get();
 

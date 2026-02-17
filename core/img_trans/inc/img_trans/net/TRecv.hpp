@@ -20,6 +20,7 @@ class TRecv
 {
   public:
 	using UniPtr    = std::unique_ptr<TRecv>;
+	using SharedPtr = std::shared_ptr<TRecv>;
 	using TimePoint = std::chrono::steady_clock::time_point;
 
   private:
@@ -32,8 +33,10 @@ class TRecv
 
 		bool isValid() const { return ip != 0 && port != 0; }
 
-		std::string toString() const
+		std::string toString() const noexcept
 		{
+			if (!isValid()) { return "Invalid IP"; }
+
 			auto ipStrOpt = TRecv::V4Addr::ipToStr(ip);
 			if (!ipStrOpt.has_value()) { return "Invalid IP"; }
 			return std::move(ipStrOpt).value() + ":" + std::to_string(port);
@@ -111,19 +114,33 @@ class TRecv
 	}
 
   public:
-	TRecv(TReassembly::SharedPtr _reassembler, u16 _port = 3334, const char* _ip = "127.0.0.1");
+	explicit TRecv(
+		TReassembly::SharedPtr _reassembler, u16 _port = 3334, const char* _ip = "127.0.0.1"
+	);
 	~TRecv();
+
+	/**
+	 * @brief: create a unique pointer to TRecv instance. 
+	 *
+	 * @throws: std::invalid_argument if reassembler is nullptr.
+	 */
+	[[nodiscard("Should not ignored the created TRecv::UniPtr")]] static UniPtr createUni(
+		TReassembly::SharedPtr reassembler, u16 port = 3334, const char* ip = "127.0.0.1"
+	)
+	{
+		return std::make_unique<TRecv>(reassembler, port, ip);
+	}
 
 	/**
 	 * @brief: create a shared pointer to TRecv instance. 
 	 *
 	 * @throws: std::invalid_argument if reassembler is nullptr.
 	 */
-	[[nodiscard("Should not ignored the created TRecv::UniPtr")]] static UniPtr create(
+	[[nodiscard("Should not ignored the created TRecv::SharedPtr")]] static SharedPtr createShared(
 		TReassembly::SharedPtr reassembler, u16 port = 3334, const char* ip = "127.0.0.1"
 	)
 	{
-		return std::make_unique<TRecv>(reassembler, port, ip);
+		return std::make_shared<TRecv>(reassembler, port, ip);
 	}
 
 	TRecv(const TRecv&)            = delete;  // Forbid copy or move
