@@ -13,6 +13,7 @@ using LoggerPtr = std::shared_ptr<spdlog::async_logger>;
 
 LoggerPtr getImgTransLogger();
 LoggerPtr getProtoLogger();
+LoggerPtr getGeneralLogger();
 
 }  // namespace gentau
 
@@ -48,6 +49,20 @@ LoggerPtr getProtoLogger();
 #define tProtoLogCritical(fmt, ...)                                                                \
 	SPDLOG_LOGGER_CRITICAL(gentau::getProtoLogger(), T_LOG_TAG_PROTO fmt __VA_OPT__(, ) __VA_ARGS__)
 
+// General Logging Macros
+#define tLogTrace(fmt, ...)                                                                        \
+	SPDLOG_LOGGER_TRACE(gentau::getGeneralLogger(), T_LOG_TAG fmt __VA_OPT__(, ) __VA_ARGS__)
+#define tLogDebug(fmt, ...)                                                                        \
+	SPDLOG_LOGGER_DEBUG(gentau::getGeneralLogger(), T_LOG_TAG fmt __VA_OPT__(, ) __VA_ARGS__)
+#define tLogInfo(fmt, ...)                                                                         \
+	SPDLOG_LOGGER_INFO(gentau::getGeneralLogger(), T_LOG_TAG fmt __VA_OPT__(, ) __VA_ARGS__)
+#define tLogWarn(fmt, ...)                                                                         \
+	SPDLOG_LOGGER_WARN(gentau::getGeneralLogger(), T_LOG_TAG fmt __VA_OPT__(, ) __VA_ARGS__)
+#define tLogError(fmt, ...)                                                                        \
+	SPDLOG_LOGGER_ERROR(gentau::getGeneralLogger(), T_LOG_TAG fmt __VA_OPT__(, ) __VA_ARGS__)
+#define tLogCritical(fmt, ...)                                                                     \
+	SPDLOG_LOGGER_CRITICAL(gentau::getGeneralLogger(), T_LOG_TAG fmt __VA_OPT__(, ) __VA_ARGS__)
+
 #else
 #define tImgTransLogTrace(fmt, ...)    ((void)0)
 #define tImgTransLogDebug(fmt, ...)    ((void)0)
@@ -62,5 +77,12 @@ LoggerPtr getProtoLogger();
 #define tProtoLogWarn(fmt, ...)     ((void)0)
 #define tProtoLogError(fmt, ...)    ((void)0)
 #define tProtoLogCritical(fmt, ...) ((void)0)
+
+#define tLogTrace(fmt, ...)    ((void)0)
+#define tLogDebug(fmt, ...)    ((void)0)
+#define tLogInfo(fmt, ...)     ((void)0)
+#define tLogWarn(fmt, ...)     ((void)0)
+#define tLogError(fmt, ...)    ((void)0)
+#define tLogCritical(fmt, ...) ((void)0)
 
 #endif

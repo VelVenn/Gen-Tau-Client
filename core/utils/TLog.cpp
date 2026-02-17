@@ -31,7 +31,7 @@ static vector<spd::sink_ptr> createSinks()
 			};
 
 			auto local_time = now_time_t.get_local_time();
-			auto log_file   = fmt::format("logs/gt_{:%Y%M%d_%H%M%S}.log", local_time);
+			auto log_file   = fmt::format("logs/gt_{:%Y%m%d_%H%M%S}.log", local_time);
 
 			auto file_sink = make_shared<spd::sinks::basic_file_sink_mt>(log_file);
 
@@ -77,6 +77,12 @@ LoggerPtr getImgTransLogger()
 LoggerPtr getProtoLogger()
 {
 	static LoggerPtr logger = createAsyncLogger("Proto");
+	return logger;
+}
+
+LoggerPtr getGeneralLogger()
+{
+	static LoggerPtr logger = createAsyncLogger("General");
 	return logger;
 }
 
