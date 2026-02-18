@@ -2,6 +2,7 @@
 
 #include "img_trans/net/TReassembly.hpp"
 
+#include "utils/TSignal.hpp"
 #include "utils/TTypeRedef.hpp"
 
 #include <arpa/inet.h>
@@ -66,11 +67,47 @@ class TRecv
 		}
 	};
 
+	struct UdpSocket
+	{
+		int fd = -1;
+		UdpSocket(int _fd) : fd(_fd) {}  // Allow implicit construction from int
+
+		UdpSocket(const UdpSocket&)            = delete;  // Forbid copy
+		UdpSocket& operator=(const UdpSocket&) = delete;
+
+		UdpSocket(UdpSocket&& other) noexcept : fd(other.fd) { other.fd = -1; }
+		UdpSocket& operator=(UdpSocket&& other) noexcept
+		{
+			if (this != &other) {
+				closeSock();
+				fd       = other.fd;
+				other.fd = -1;
+			}
+			return *this;
+		}
+
+		// Allow implicit conversion to int for socket operations
+		operator int() const { return fd; }
+
+		~UdpSocket() { closeSock(); }
+
+		void closeSock()
+		{
+			if (fd > -1) {
+				::close(fd);
+				fd = -1;
+			}
+		}
+	};
+
   private:
 	const TReassembly::SharedPtr reassembler;
-	int                          sockfd       = -1;
+	UdpSocket                    updSock      = -1;
 	sockaddr_in                  listenAddr   = {};
 	std::atomic<TimePoint>       lastRecvTime = TimePoint::min();
+
+  public:
+	TSignal<TRecv, i32> onRecvError;
 
   private:
 	static constexpr i32     kRecvBufferSize = 4 * 1024 * 1024;  // 4MB
@@ -106,7 +143,7 @@ class TRecv
 	 *        it's running when calling this method.
 	 */
 	i32                   bindV4(u16 port, const char* ip);
-	bool                  isBound() const noexcept { return sockfd > -1; }
+	bool                  isBound() const noexcept { return updSock > -1; }
 	std::optional<V4Addr> getListenAddr() const noexcept
 	{
 		if (!isBound()) { return std::nullopt; }

@@ -39,7 +39,7 @@ int TRecv::start()
 	}
 
 	if (recvThread.joinable()) {
-		tImgTransLogWarn("Receiving thread is already running");
+		tImgTransLogInfo("Receiving thread is already running");
 		return 0;  // Already running, consider it a success
 	}
 
@@ -48,7 +48,7 @@ int TRecv::start()
 
 	recvThread = jthread([this,
 						  passThru = std::move(threadErrPassThru)](stop_token sToken) mutable {
-		if (::setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, &kRecvBufferSize, sizeof(i32)) < 0) {
+		if (::setsockopt(updSock, SOL_SOCKET, SO_RCVBUF, &kRecvBufferSize, sizeof(i32)) < 0) {
 			tImgTransLogError(
 				"Failed to set socket kernel receive buffer size, error: {}",
 				error_code(errno, system_category()).message()
@@ -57,7 +57,7 @@ int TRecv::start()
 			return;
 		}
 
-		if (::setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &kRecvTimeout, sizeof(timeval)) < 0) {
+		if (::setsockopt(updSock, SOL_SOCKET, SO_RCVTIMEO, &kRecvTimeout, sizeof(timeval)) < 0) {
 			tImgTransLogError(
 				"Failed to set socket receive timeout, error: {}",
 				error_code(errno, system_category()).message()
@@ -71,28 +71,39 @@ int TRecv::start()
 		array<u8, MTU_LEN> recvBuffer{};
 		memset(&recvBuffer, 0, MTU_LEN);
 
+		u64 packetCount = 0;
+
 		while (!sToken.stop_requested()) {
-			auto ret = ::recv(sockfd, recvBuffer.data(), MTU_LEN, 0);
+			auto ret = ::recv(updSock, recvBuffer.data(), MTU_LEN, 0);
 
 			if (ret > 0) {
 				lastRecvTime.store(chrono::steady_clock::now());
 
 				auto header = TReassembly::Header::parse(recvBuffer);
 				if (header) {
-					tImgTransLogDebug(
-						"Received packet - frameIdx: {}, secIdx: {}, frameLen: {}",
-						header->frameIdx,
-						header->secIdx,
-						header->frameLen
-					);
+					if (packetCount++ % 100 == 0) {
+						tImgTransLogDebug(
+							"Received packet - frameIdx: {}, secIdx: {}, frameLen: {}, packetSize: "
+							"{}",
+							header->frameIdx,
+							header->secIdx,
+							header->frameLen,
+							ret
+						);
+					}
 				} else {
 					tImgTransLogWarn("Received packet too small to contain header, size: {}", ret);
 				}
+			} else if (ret == 0) {
+				// tImgTransLogTrace("Received empty packet");
+				continue;
 			} else {
 				if (errno == EAGAIN || errno == EWOULDBLOCK) {
 					// Do some periodic task...
 					continue;  // Timeout, just try again
 				} else {
+					onRecvError(errno);
+
 					tImgTransLogError(
 						"Error receiving data, error: {}",
 						error_code(errno, system_category()).message()
@@ -114,9 +125,10 @@ i32 TRecv::bindV4(u16 port, const char* ip)
 {
 	stop();
 
-	auto newSockfd = ::socket(AF_INET, SOCK_DGRAM, 0);
+	updSock.closeSock();
+	auto newSockFd = ::socket(AF_INET, SOCK_DGRAM, 0);
 
-	if (newSockfd < 0) {
+	if (newSockFd < 0) {
 		tImgTransLogError(
 			"Failed to create new socket, error: {}", error_code(errno, system_category()).message()
 		);
@@ -128,7 +140,7 @@ i32 TRecv::bindV4(u16 port, const char* ip)
 	auto v4Addr = V4Addr::create(ip, port);
 	if (!v4Addr.has_value()) {
 		tImgTransLogError("Invalid IP address: {}:{}", ip, port);
-		::close(newSockfd);
+		::close(newSockFd);
 		return EINVAL;  // Invalid argument
 	}
 
@@ -136,20 +148,20 @@ i32 TRecv::bindV4(u16 port, const char* ip)
 	newAddr.sin_addr.s_addr = v4Addr->ip;
 	newAddr.sin_port        = ::htons(v4Addr->port);
 
-	if (::bind(newSockfd, reinterpret_cast<sockaddr*>(&newAddr), sizeof(newAddr)) < 0) {
+	if (::bind(newSockFd, reinterpret_cast<sockaddr*>(&newAddr), sizeof(newAddr)) < 0) {
 		tImgTransLogError(
 			"Failed to bind socket to ip: {}, error: {}",
 			v4Addr->toString(),
 			error_code(errno, system_category()).message()
 		);
-		::close(newSockfd);
+		::close(newSockFd);
 		return errno;
 	}
 
-	sockfd     = newSockfd;
+	updSock    = newSockFd;
 	listenAddr = newAddr;
 
-	tImgTransLogInfo("New socket created successfully");
+	tImgTransLogInfo("New socket created, bound to {}", v4Addr->toString());
 
 	return 0;
 }
@@ -172,10 +184,7 @@ TRecv::TRecv(TReassembly::SharedPtr _reassembler, u16 _port, const char* _ip) :
 
 TRecv::~TRecv()
 {
-	if (isBound()) {
-		::close(sockfd);
-		tImgTransLogDebug("TRecv resources released, socket closed");
-	}
+	tImgTransLogDebug("TRecv released, closing socket...");
 }
 
 }  // namespace gentau
