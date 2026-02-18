@@ -2,6 +2,8 @@
 #include "img_trans/net/TRecv.hpp"
 #include "utils/TLog.hpp"
 
+#include <atomic>
+#include <csignal>
 #include <exception>
 #include <iostream>
 #include <memory>
@@ -12,19 +14,30 @@
 using namespace gentau;
 using namespace std;
 
+atomic_bool isRunning(false);
+
+void onSignal(int signal)
+{
+	tLogInfo("Signal {} received, stopping TRecv...", signal);
+	isRunning.store(false);
+}
+
 int main()
 {
 	try {
 		TReassembly::SharedPtr reassembler = std::make_shared<TReassembly>(nullptr);
 		auto                   recv        = TRecv::createUni(reassembler);
 
-        recv->start();
+		signal(SIGINT, onSignal);
+		signal(SIGTERM, onSignal);
 
-        cout << "TRecv is running. Press Ctrl+C to stop." << endl;
+		recv->start();
 
-        while (true) {
-            this_thread::sleep_for(100ms);
-        }
+		cout << "TRecv is running. Press Ctrl+C to stop." << endl;
+
+		isRunning.store(true);
+
+		while (isRunning.load()) { this_thread::sleep_for(100ms); }
 	} catch (const exception& ex) {
 		tLogError("Error happend: {}", ex.what());
 		return -1;
