@@ -2,6 +2,7 @@
 
 #include "conf/version.hpp"
 
+#include "img_trans/vid_render/TFramePool.hpp"
 #include "utils/TLog.hpp"
 #include "utils/TLogical.hpp"
 
@@ -9,6 +10,7 @@
 #include <gst/app/gstappsrc.h>
 #include <gst/gst.h>
 #include <gst/gstenumtypes.h>
+#include <gst/gstmemory.h>
 
 #include <exception>
 #include <future>
@@ -17,6 +19,7 @@
 #include <stop_token>
 #include <string_view>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #define T_LOG_TAG_IMG       "[Video Render] "
@@ -489,6 +492,59 @@ bool TVidRender::tryPushFrame(TVidRender::FramePtr frame)
 			auto p = static_cast<std::vector<u8>*>(data);
 			delete p;
 		}
+	);
+
+	if (buffer) {
+		// Push may success at GST_STATE_PAUSED or GST_STATE_PLAYING
+		auto ret = gst_app_src_push_buffer(GST_APP_SRC(fixedSrc), buffer);
+		if (ret == GST_FLOW_OK) {
+			lastPushSuccess.store(chrono::steady_clock::now());
+			return true;
+		} else {
+			tImgTransLogError(
+				"Failed to push buffer to appsrc, flow return: {}", gst_flow_get_name(ret)
+			);
+		}
+	}
+
+	return false;
+}
+
+bool TVidRender::tryPushFrame(TFramePool::FrameData&& frame)
+{
+	if (!fixedPipe || !fixedSrc) {
+		tImgTransLogError("Push frame failed: Pipeline is not initialized.");
+		return false;
+	}
+
+	auto curBytes = gst_app_src_get_current_level_bytes(GST_APP_SRC(fixedSrc));
+	auto limit    = maxBufferBytes.load();
+	if (curBytes > limit) {
+		tImgTransLogWarn(
+			"Current buffer level '{}' bytes exceeds the maximum threshold of '{}' bytes, skipping "
+			"frame push.",
+			curBytes,
+			limit
+		);
+		return false;
+	}
+
+	auto frameDataPtr = new TFramePool::FrameData(std::move(frame));
+
+	if (!frameDataPtr->isValid() || !frameDataPtr->getDataLen()) {
+		tImgTransLogError("Invalid frame data, failed to push to pipeline.");
+		delete frameDataPtr;
+		return false;
+	}
+
+	GstBuffer* buffer = gst_buffer_new_wrapped_full(
+		static_cast<GstMemoryFlags>(0),
+		frameDataPtr->data(),
+		TFramePool::slotLen,
+		0,
+		frameDataPtr->getDataLen(),
+		frameDataPtr,
+		[](gpointer data) { delete static_cast<TFramePool::FrameData*>(data); }
 	);
 
 	if (buffer) {

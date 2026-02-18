@@ -1,5 +1,7 @@
 #pragma once
 
+#include "img_trans/vid_render/TFramePool.hpp"
+
 #include "utils/TSignal.hpp"
 #include "utils/TTypeRedef.hpp"
 
@@ -96,6 +98,9 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	}
 
   private:
+	TFramePool framePool;
+
+  private:
 	GstElement* fixedPipe;  // Should not changed the pointer after init
 	GstElement* fixedSrc;   // Should not changed the pointer after init
 	GstElement* fixedSink;  // Should not changed the pointer after init
@@ -110,15 +115,15 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	std::atomic<TimePoint> lastPushSuccess = TimePoint::min();
 	std::atomic<u64>       maxBufferBytes  = 262'144;  // Default to 256 KB
 
+  private:
+	std::jthread busThread;
+
   public:
 	u64  getMaxBufferBytes() const { return maxBufferBytes.load(); }    // MT-SAFE
 	void setMaxBufferBytes(u64 bytes) { maxBufferBytes.store(bytes); }  // MT-SAFE
 
 	// MT-SAFE
 	TimePoint getLastPushSuccessTime() const { return lastPushSuccess.load(); }
-
-  private:
-	std::jthread busThread;
 
   private:
 	static void onDecoderPadAdded(GstElement* decoder, GstPad* new_pad, gpointer user_data);
@@ -135,7 +140,33 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	GstElement* const sink() { return this->fixedSink; }
 
   public:
+	/**
+	 * @brief: Try to push a frame into the pipeline.
+	 * @return: true if the frame is successfully pushed.
+	 * @note: NOT MT-SAFE! Strongly recommend to call this from the main thread 
+	 * 		  or the thread that created the TVidRender instance. DO NOT call 
+	 *        this method if you are calling tryPushFrame(TFramePool::FrameData) 
+	 *        already.
+	 */
 	bool tryPushFrame(FramePtr frame);
+
+	/**
+	 * @brief: Try to push a frame into the pipeline.
+	 * @return: true if the frame is successfully pushed.
+	 * @note: MT-SAFE only when there is SINGLE caller. DO NOT call this method 
+	 *        concurrently from multiple threads, or it may cause race condition.
+	 *        DO NOT call tryPushFrame(FramePtr) if you are calling this method 
+	 *        already.
+	 */
+	bool tryPushFrame(TFramePool::FrameData&& frame);
+
+	/**
+	 * @brief: Acquire a frame slot from the frame pool.
+	 * @return: An optional TFramePool::FrameData. 
+	 * @note: MT-SAFE only when there is SINGLE caller. DO NOT call this method 
+	 *        concurrently from multiple threads, or it may cause race condition.
+	 */
+	auto acquireFrameSlot() { return framePool.acquire(); }
 
   public:
 	/** 
