@@ -135,9 +135,9 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	bool initBusThread();
 
   private:
-	GstElement* const pipeline() { return this->fixedPipe; }
-	GstElement* const src() { return this->fixedSrc; }
-	GstElement* const sink() { return this->fixedSink; }
+	GstElement* pipeline() { return this->fixedPipe; }
+	GstElement* src() { return this->fixedSrc; }
+	GstElement* sink() { return this->fixedSink; }
 
   public:
 	/**
