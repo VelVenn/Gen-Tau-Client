@@ -1,11 +1,16 @@
 #pragma once
 
+#include "img_trans/vid_render/TFramePool.hpp"
 #include "img_trans/vid_render/TVidRender.hpp"
 
 #include "utils/TTypeRedef.hpp"
 
+#include <array>
 #include <atomic>
+#include <bitset>
+#include <chrono>
 #include <memory>
+#include <optional>
 #include <span>
 
 namespace gentau {
@@ -15,12 +20,14 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
 {
   public:
 	using SharedPtr = std::shared_ptr<TReassembly>;
+	using TimePoint = std::chrono::steady_clock::time_point;
 
   public:
 	/**
      * @brief: Header struct of the UDP packet according to the RM Comm. Protocol 
      *
-     * @note: Little-endian, size is 8 bytes, no alignment.
+     * @note: Little-endian, size is 8 bytes, no alignment, might fail to construct on some
+	 *        specific CPU archs.
      *        Ref: https://qingflow.com/appView/c5rf6rkkbs02/shareView/c5rf6slgbs02?applyId=693818572
      */
 	struct [[gnu::packed]] Header
@@ -55,19 +62,88 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
 			std::span<const u8> data
 		) noexcept
 		{
-			if (data.size() < sizeof(Header)) [[unlikely]] { return nullptr; }
+			if (data.size() < sizeof(Header)) { return nullptr; }
 			return reinterpret_cast<const Header*>(data.data());
 		}
 	};
-
-  private:
-	const TVidRender::SharedPtr renderer;
-
-  private:
-	std::atomic<bool> synced = false;
+	static_assert(sizeof(Header) == 8, "Header size must be 8 bytes");
 
   public:
-	explicit TReassembly(TVidRender::SharedPtr _renderer) : renderer(std::move(_renderer)) {};
+	static constexpr u32 maxReAsmSlots  = 5;
+	static constexpr u32 maxPayloadSize = MTU_LEN - sizeof(Header);
+	static constexpr u32 maxSecPerFrame = 1536;
+	static constexpr u32 bigFrameThres  = 5000;
+
+	static constexpr std::chrono::milliseconds reassembleTimeout{ 70 };
+	static constexpr std::chrono::milliseconds syncTimeout{ 1000 };
+
+  private:
+	struct ReassemblingFrame
+	{
+		std::optional<TFramePool::FrameData> frameSlot    = std::nullopt;
+		u16                                  frameIdx     = 0;
+		u32                                  curLen       = 0;
+		TimePoint                            asmStartTime = TimePoint::min();
+		std::bitset<maxSecPerFrame>          receivedSecs;
+
+		void clear() noexcept
+		{
+			if (frameSlot.has_value()) { frameSlot.reset(); }
+			frameIdx     = 0;
+			curLen       = 0;
+			asmStartTime = TimePoint::min();
+			receivedSecs.reset();
+		}
+
+		TFramePool::FrameData steal()
+		{
+			if (!frameSlot.has_value()) {
+				return TFramePool::FrameData(nullptr, nullptr, UINT32_MAX);
+			}
+
+			auto data = std::move(frameSlot).value();
+			frameSlot.reset();
+
+			return data;
+		}
+
+		bool isOccupied() const noexcept
+		{
+			if (!frameSlot.has_value()) { return false; }
+
+			return frameSlot.value().isValid();
+		}
+
+		bool isComplete() const noexcept
+		{
+			if (!frameSlot.has_value()) { return false; }
+
+			if (!frameSlot.value().isValid()) { return false; }
+
+			return curLen == frameSlot.value().getDataLen();
+		}
+
+		bool fill(std::span<u8> packet, const Header* header);
+	};
+
+  private:
+	const TVidRender::SharedPtr                  renderer;
+	std::array<ReassemblingFrame, maxReAsmSlots> rFrames;
+
+  private:
+	std::atomic<TimePoint> lastSyncedTime = TimePoint::min();
+	std::atomic<u16>       lastPushedIdx  = 0;
+	std::atomic<bool>      synced         = false;
+
+  public:
+	void onPacketRecv(std::span<u8> packetData, u32 packetLen);
+	void onRecvTimeoutScan();
+
+  private:
+	ReassemblingFrame* findReAsmSlot(u16 frameIdx);
+
+  public:
+	explicit TReassembly(TVidRender::SharedPtr _renderer);
 
 	~TReassembly() = default;
 

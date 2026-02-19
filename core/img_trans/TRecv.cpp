@@ -68,10 +68,14 @@ int TRecv::start()
 
 		passThru.set_value(0);
 
-		array<u8, MTU_LEN> recvBuffer{};
-		memset(&recvBuffer, 0, MTU_LEN);
+		struct [[gnu::aligned(64)]] RecvBuf
+		{
+			array<u8, MTU_LEN> packet;
 
-		u64 packetCount = 0;
+			auto data() { return packet.data(); }
+
+			RecvBuf() { memset(packet.data(), 0, MTU_LEN); }
+		} recvBuffer;
 
 		while (!sToken.stop_requested()) {
 			auto ret = ::recv(updSock, recvBuffer.data(), MTU_LEN, 0);
@@ -79,27 +83,13 @@ int TRecv::start()
 			if (ret > 0) {
 				lastRecvTime.store(chrono::steady_clock::now());
 
-				auto header = TReassembly::Header::parse(recvBuffer);
-				if (header) {
-					if (packetCount++ % 100 == 0) {
-						tImgTransLogDebug(
-							"Received packet - frameIdx: {}, secIdx: {}, frameLen: {}, packetSize: "
-							"{}",
-							header->frameIdx,
-							header->secIdx,
-							header->frameLen,
-							ret
-						);
-					}
-				} else {
-					tImgTransLogWarn("Received packet too small to contain header, size: {}", ret);
-				}
+				reassembler->onPacketRecv(recvBuffer.packet, ret);
 			} else if (ret == 0) {
 				// tImgTransLogTrace("Received empty packet");
 				continue;
 			} else {
 				if (errno == EAGAIN || errno == EWOULDBLOCK) {
-					// Do some periodic task...
+					reassembler->onRecvTimeoutScan();
 					continue;  // Timeout, just try again
 				} else {
 					onRecvError(errno);
