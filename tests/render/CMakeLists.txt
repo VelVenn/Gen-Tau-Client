@@ -39,6 +39,17 @@ gt_register_test(
 )
 
 gt_register_test(
+  NAME rend-net 
+  SRC rend-net.cpp
+  USE_QT
+  QML_URI Render.Net
+  QML_FILES qml/RendTest.qml
+  DEPS
+    img-trans
+    Qt6::Quick
+)
+
+gt_register_test(
   NAME rend-status-change 
   SRC rend-status-change.cpp
   USE_QT
