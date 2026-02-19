@@ -120,9 +120,10 @@ void TReassembly::onPacketRecv(std::span<u8> packetData, u32 packetLen)
 
 	if (synced.load() && frameIdxDiff < minFrameIdxDiff) {
 		tImgTransLogWarn(
-			"Received abnormally old frame: {}, last pushed frame: {}, considering it as new "
+			"Received abnormally old frame: {} (sec {}), last pushed frame: {}, considering it as new "
 			"section",
 			header->frameIdx,
+			header->secIdx,
 			lastPushedIdx.load()
 		);
 		synced.store(false);
