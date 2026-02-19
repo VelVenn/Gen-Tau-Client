@@ -73,6 +73,7 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
 	static constexpr u32 maxPayloadSize = MTU_LEN - sizeof(Header);
 	static constexpr u32 maxSecPerFrame = 1536;
 	static constexpr u32 bigFrameThres  = 5000;
+	static constexpr i16 minFrameIdxDiff  = -180;  // About 3 seconds, assuming 60 FPS
 
 	static constexpr std::chrono::milliseconds reassembleTimeout{ 70 };
 	static constexpr std::chrono::milliseconds syncTimeout{ 1000 };
@@ -123,7 +124,7 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
 			return curLen == frameSlot.value().getDataLen();
 		}
 
-		bool fill(std::span<u8> packet, u32 packetLen,const Header* header);
+		bool fill(std::span<u8> packet, u32 packetLen, const Header* header);
 	};
 
   private:

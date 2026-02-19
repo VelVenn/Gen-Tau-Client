@@ -116,11 +116,24 @@ void TReassembly::onPacketRecv(std::span<u8> packetData, u32 packetLen)
 		return;
 	}
 
-	lastSyncedTime.store(chrono::steady_clock::now());
+	auto frameIdxDiff = Header::diff(header->frameIdx, lastPushedIdx.load());
 
-	if (synced.load() && !Header::isAfter(header->frameIdx, lastPushedIdx.load())) { return; }
+	if (synced.load() && frameIdxDiff < minFrameIdxDiff) {
+		tImgTransLogWarn(
+			"Received abnormally old frame: {}, last pushed frame: {}, considering it as new "
+			"section",
+			header->frameIdx,
+			lastPushedIdx.load()
+		);
+		synced.store(false);
+	}
+
+	if (synced.load() && frameIdxDiff <= 0) {
+		return;
+	}  // Drop likely normal duplicate or out-of-order packet
 
 	if (!synced.load()) { synced.store(true); }
+	lastSyncedTime.store(chrono::steady_clock::now());
 
 	auto rSlot = findReAsmSlot(header->frameIdx);
 	if (!rSlot) [[unlikely]] {
