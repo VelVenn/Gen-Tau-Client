@@ -127,6 +127,7 @@ void TReassembly::onPacketRecv(std::span<u8> packetData, u32 packetLen)
 			lastPushedIdx.load()
 		);
 		synced.store(false);
+		lastPushedIdx.store(header->frameIdx - 1); // set to one before current. It's ok to overflow.
 	}
 
 	if (synced.load() && frameIdxDiff <= 0) {
