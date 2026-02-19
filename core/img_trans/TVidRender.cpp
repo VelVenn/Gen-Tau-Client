@@ -538,7 +538,7 @@ bool TVidRender::tryPushFrame(TFramePool::FrameData&& frame)
 	}
 
 	GstBuffer* buffer = gst_buffer_new_wrapped_full(
-		static_cast<GstMemoryFlags>(0),
+		static_cast<GstMemoryFlags>(0), // Standard buffer, can be writable(?)
 		frameDataPtr->data(),
 		TFramePool::slotLen,
 		0,
