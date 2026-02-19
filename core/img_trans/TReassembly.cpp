@@ -83,6 +83,8 @@ auto TReassembly::findReAsmSlot(u16 idx) -> ReassemblingFrame*
 
 	if (firstEmpty) { return firstEmpty; }
 
+	// 如果网络状况极差，可能需要加入额外的 Header::isAfter 判断，但这种判断可能会导致僵尸帧无法被
+	// 正常清理，这里暂时保持抢占式清理策略即可
 	if (oldestSmall) {
 		tImgTransLogWarn("Dropping oldest SMALL frame: {}", oldestSmall->frameIdx);
 		oldestSmall->clear();
@@ -100,6 +102,12 @@ auto TReassembly::findReAsmSlot(u16 idx) -> ReassemblingFrame*
 
 void TReassembly::onPacketRecv(std::span<u8> packetData, u32 packetLen)
 {
+	auto now = chrono::steady_clock::now();
+	if (synced.load() && now - lastSyncedTime.load() > syncTimeout) {
+		tImgTransLogWarn("Sync timeout detected on recieving packet.");
+		synced.store(false);
+	}
+
 	if (packetData.empty() || packetLen == 0) { return; }
 
 	auto header = Header::parse(packetData);
@@ -120,22 +128,30 @@ void TReassembly::onPacketRecv(std::span<u8> packetData, u32 packetLen)
 
 	if (synced.load() && frameIdxDiff < minFrameIdxDiff) {
 		tImgTransLogWarn(
-			"Received abnormally old frame: {} (sec {}), last pushed frame: {}, considering it as new "
-			"section",
+			"Received abnormally old frame: {} (sec {}), last pushed frame: {}, considering it as "
+			"new session start.",
 			header->frameIdx,
 			header->secIdx,
 			lastPushedIdx.load()
 		);
 		synced.store(false);
-		lastPushedIdx.store(header->frameIdx - 1); // set to one before current. It's ok to overflow.
 	}
 
 	if (synced.load() && frameIdxDiff <= 0) {
 		return;
 	}  // Drop likely normal duplicate or out-of-order packet
 
-	if (!synced.load()) { synced.store(true); }
-	lastSyncedTime.store(chrono::steady_clock::now());
+	if (!synced.load()) {
+		synced.store(true);
+
+		// set to one before current. It's ok to overflow.
+		lastPushedIdx.store(header->frameIdx - 1);
+
+		tImgTransLogDebug(
+			"Session synced at frame {}, sec {}.", header->frameIdx, header->secIdx
+		);
+	}
+	lastSyncedTime.store(now);
 
 	auto rSlot = findReAsmSlot(header->frameIdx);
 	if (!rSlot) [[unlikely]] {
@@ -153,7 +169,7 @@ void TReassembly::onPacketRecv(std::span<u8> packetData, u32 packetLen)
 		rSlot->frameSlot->setDataLen(header->frameLen);
 
 		rSlot->frameIdx     = header->frameIdx;
-		rSlot->asmStartTime = chrono::steady_clock::now();
+		rSlot->asmStartTime = now;
 	}
 
 	if (rSlot->fill(packetData, packetLen, header)) {
