@@ -123,7 +123,7 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
 			return curLen == frameSlot.value().getDataLen();
 		}
 
-		bool fill(std::span<u8> packet, const Header* header);
+		bool fill(std::span<u8> packet, u32 packetLen,const Header* header);
 	};
 
   private:

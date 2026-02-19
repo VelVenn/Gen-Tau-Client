@@ -22,7 +22,7 @@ TReassembly::TReassembly(TVidRender::SharedPtr _renderer) : renderer(std::move(_
 	}
 }
 
-bool TReassembly::ReassemblingFrame::fill(std::span<u8> packet, const Header* header)
+bool TReassembly::ReassemblingFrame::fill(std::span<u8> packet, u32 packetLen, const Header* header)
 {
 	if (!isOccupied() || isComplete()) { return false; }
 
@@ -30,8 +30,10 @@ bool TReassembly::ReassemblingFrame::fill(std::span<u8> packet, const Header* he
 
 	u16 secIdx      = header->secIdx;
 	u32 offset      = secIdx * maxPayloadSize;
-	u32 payloadSize = packet.size() < sizeof(Header) ? 0 : packet.size() - sizeof(Header);
+	u32 payloadSize = packetLen < sizeof(Header) ? 0 : packetLen - sizeof(Header);
 	u32 frameLen    = frameSlot->getDataLen();
+
+	// tImgTransLogDebug("secIdx {} | offset {} | payloadSize {} | frameLen {}", secIdx, offset, payloadSize, frameLen);
 
 	if (secIdx >= receivedSecs.size() || payloadSize == 0) { return false; }
 
@@ -42,6 +44,8 @@ bool TReassembly::ReassemblingFrame::fill(std::span<u8> packet, const Header* he
 	memcpy(frameSlot->data() + offset, packet.data() + sizeof(Header), payloadSize);
 	receivedSecs.set(secIdx);
 	curLen += payloadSize;
+
+	// tImgTransLogDebug("curLen {}", curLen);
 
 	return true;
 }
@@ -137,7 +141,7 @@ void TReassembly::onPacketRecv(std::span<u8> packetData, u32 packetLen)
 		rSlot->asmStartTime = chrono::steady_clock::now();
 	}
 
-	if (rSlot->fill(packetData, header)) {
+	if (rSlot->fill(packetData, packetLen, header)) {
 		if (rSlot->isComplete()) {
 			renderer->tryPushFrame(rSlot->steal());
 			lastPushedIdx.store(header->frameIdx);
