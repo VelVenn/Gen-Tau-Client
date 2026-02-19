@@ -191,7 +191,10 @@ void TReassembly::onRecvTimeoutScan()
 {
 	auto now = chrono::steady_clock::now();
 
-	if (synced.load() && now - lastSyncedTime.load() > syncTimeout) { synced.store(false); }
+	if (synced.load() && now - lastSyncedTime.load() > syncTimeout) { 
+		tImgTransLogWarn("Sync timeout detected on recieving packet timeout.");
+		synced.store(false); 
+	}
 
 	for (auto& frame : rFrames) {
 		if (frame.isOccupied() && now - frame.asmStartTime > reassembleTimeout) {
