@@ -11,7 +11,7 @@
 #include <optional>
 
 namespace gentau {
-class TFramePool
+class [[gnu::aligned(64)]] TFramePool
 {
   public:
 	static constexpr u32 poolSize = 10;
