@@ -22,11 +22,13 @@ TReassembly::TReassembly(TVidRender::SharedPtr _renderer) : renderer(std::move(_
 	}
 }
 
-bool TReassembly::ReassemblingFrame::fill(std::span<u8> packet, u32 packetLen, const Header* header)
+bool TReassembly::ReassemblingFrame::fill(std::span<u8> packet, const Header* header)
 {
 	if (!isOccupied() || isComplete()) { return false; }
 
 	if (packet.empty() || header == nullptr) { return false; }
+
+	auto packetLen = static_cast<u32>(packet.size());
 
 	u16 secIdx      = header->secIdx;
 	u32 offset      = secIdx * maxPayloadSize;
@@ -103,7 +105,7 @@ auto TReassembly::findReAsmSlot(u16 idx) -> ReassemblingFrame*
 	return nullptr;
 }
 
-void TReassembly::onPacketRecv(std::span<u8> packetData, u32 packetLen)
+void TReassembly::onPacketRecv(std::span<u8> packetData)
 {
 	auto now = chrono::steady_clock::now();
 	if (synced.load() && now - lastSyncedTime.load() > syncTimeout) {
@@ -111,7 +113,10 @@ void TReassembly::onPacketRecv(std::span<u8> packetData, u32 packetLen)
 		synced.store(false);
 	}
 
-	if (packetData.empty() || packetLen == 0) { return; }
+	if (packetData.empty() || packetData.size() < sizeof(Header)) {
+		tImgTransLogWarn("Received packet too small to contain valid header, ignoring.");
+		return;
+	}
 
 	auto header = Header::parse(packetData);
 	if (!header) {
@@ -150,9 +155,7 @@ void TReassembly::onPacketRecv(std::span<u8> packetData, u32 packetLen)
 		// set to one before current. It's ok to overflow.
 		lastPushedIdx.store(header->frameIdx - 1);
 
-		tImgTransLogDebug(
-			"Session synced at frame {}, sec {}.", header->frameIdx, header->secIdx
-		);
+		tImgTransLogDebug("Session synced at frame {}, sec {}.", header->frameIdx, header->secIdx);
 	}
 	lastSyncedTime.store(now);
 
@@ -175,7 +178,7 @@ void TReassembly::onPacketRecv(std::span<u8> packetData, u32 packetLen)
 		rSlot->asmStartTime = now;
 	}
 
-	if (rSlot->fill(packetData, packetLen, header)) {
+	if (rSlot->fill(packetData, header)) {
 		if (rSlot->isComplete()) {
 			renderer->tryPushFrame(rSlot->steal());
 			lastPushedIdx.store(header->frameIdx);
@@ -194,9 +197,9 @@ void TReassembly::onRecvTimeoutScan()
 {
 	auto now = chrono::steady_clock::now();
 
-	if (synced.load() && now - lastSyncedTime.load() > syncTimeout) { 
+	if (synced.load() && now - lastSyncedTime.load() > syncTimeout) {
 		tImgTransLogWarn("Sync timeout detected on recieving packet timeout.");
-		synced.store(false); 
+		synced.store(false);
 	}
 
 	for (auto& frame : rFrames) {

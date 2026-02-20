@@ -180,6 +180,7 @@ class TRecv
 		return std::make_shared<TRecv>(reassembler, port, ip);
 	}
 
+	TRecv()                        = delete;  // Forbid default construction
 	TRecv(const TRecv&)            = delete;  // Forbid copy or move
 	TRecv& operator=(const TRecv&) = delete;
 	TRecv(TRecv&&)                 = delete;

@@ -83,7 +83,7 @@ int TRecv::start()
 			if (ret > 0) {
 				lastRecvTime.store(chrono::steady_clock::now());
 
-				reassembler->onPacketRecv(recvBuffer.packet, ret);
+				reassembler->onPacketRecv(std::span(recvBuffer.packet).subspan(0, ret));
 			} else if (ret == 0) {
 				// tImgTransLogTrace("Received empty packet");
 				continue;

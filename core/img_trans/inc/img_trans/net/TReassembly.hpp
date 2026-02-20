@@ -69,11 +69,11 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
 	static_assert(sizeof(Header) == 8, "Header size must be 8 bytes");
 
   public:
-	static constexpr u32 maxReAsmSlots  = 5;
-	static constexpr u32 maxPayloadSize = MTU_LEN - sizeof(Header);
-	static constexpr u32 maxSecPerFrame = 1536;
-	static constexpr u32 bigFrameThres  = 5000;
-	static constexpr i16 minFrameIdxDiff  = -180;  // About 3 seconds, assuming 60 FPS
+	static constexpr u32 maxReAsmSlots   = 5;
+	static constexpr u32 maxPayloadSize  = MTU_LEN - sizeof(Header);
+	static constexpr u32 maxSecPerFrame  = 1536;
+	static constexpr u32 bigFrameThres   = 5000;
+	static constexpr i16 minFrameIdxDiff = -180;  // About 3 seconds, assuming 60 FPS
 
 	static constexpr std::chrono::milliseconds reassembleTimeout{ 70 };
 	static constexpr std::chrono::milliseconds syncTimeout{ 1000 };
@@ -124,7 +124,7 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
 			return curLen == frameSlot.value().getDataLen();
 		}
 
-		bool fill(std::span<u8> packet, u32 packetLen, const Header* header);
+		bool fill(std::span<u8> packet, const Header* header);
 	};
 
   private:
@@ -137,7 +137,14 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
 	std::atomic<bool>      synced         = false;
 
   public:
-	void onPacketRecv(std::span<u8> packetData, u32 packetLen);
+	/**
+	 * @brief: Handle a received packet.
+	 * 
+	 * @param packetData: The raw packet data to be processed. The span must only contain 
+	 *                    the valid data received, and should not include any extra padding.
+	 * @note: NOT MT-SAFE! Should be called from a single thread synchronously.
+	 */
+	void onPacketRecv(std::span<u8> packetData);
 	void onRecvTimeoutScan();
 
   private:
@@ -146,8 +153,14 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
   public:
 	explicit TReassembly(TVidRender::SharedPtr _renderer);
 
+	SharedPtr create(TVidRender::SharedPtr _renderer)
+	{
+		return std::make_shared<TReassembly>(std::move(_renderer));
+	}
+
 	~TReassembly() = default;
 
+	TReassembly()                              = delete;  // Forbid default construction
 	TReassembly(const TReassembly&)            = delete;  // Forbid copy or move
 	TReassembly& operator=(const TReassembly&) = delete;
 	TReassembly(TReassembly&&)                 = delete;
