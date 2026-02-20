@@ -24,7 +24,6 @@ class TRecv
 	using SharedPtr = std::shared_ptr<TRecv>;
 	using TimePoint = std::chrono::steady_clock::time_point;
 
-  private:
 	struct V4Addr
 	{
 		u32 ip   = 0;
@@ -67,6 +66,7 @@ class TRecv
 		}
 	};
 
+  private:
 	struct UdpSocket
 	{
 		int fd = -1;
@@ -166,8 +166,18 @@ class TRecv
 	 * @note: NOT MT-SAFE! Will stop the current receiving thread if 
 	 *        it's running when calling this method.
 	 */
-	i32                   bindV4(u16 port, const char* ip);
-	bool                  isBound() const noexcept { return updSock > -1; }
+	i32 bindV4(u16 port, const char* ip);
+
+	/**
+	 * @brief: Check if the socket is successfully bound.
+	 * @note: NOT MT-SAFE!
+	 */
+	bool isBound() const noexcept { return updSock > -1; }
+
+	/**
+	 * @brief: Get the currently bound address. If not bound, returns std::nullopt.
+	 * @note: NOT MT-SAFE!
+	 */
 	std::optional<V4Addr> getListenAddr() const noexcept
 	{
 		if (!isBound()) { return std::nullopt; }
