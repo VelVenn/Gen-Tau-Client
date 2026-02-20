@@ -32,6 +32,7 @@ bool TReassembly::ReassemblingFrame::fill(std::span<u8> packet, u32 packetLen, c
 	u32 offset      = secIdx * maxPayloadSize;
 	u32 payloadSize = packetLen < sizeof(Header) ? 0 : packetLen - sizeof(Header);
 	u32 frameLen    = frameSlot->getDataLen();
+	u8* destPtr     = frameSlot->data();
 
 	// tImgTransLogDebug("secIdx {} | offset {} | payloadSize {} | frameLen {}", secIdx, offset, payloadSize, frameLen);
 
@@ -41,7 +42,9 @@ bool TReassembly::ReassemblingFrame::fill(std::span<u8> packet, u32 packetLen, c
 
 	if (offset + payloadSize > frameLen) { return false; }
 
-	memcpy(frameSlot->data() + offset, packet.data() + sizeof(Header), payloadSize);
+	if (!destPtr) { return false; }
+
+	memcpy(destPtr + offset, packet.data() + sizeof(Header), payloadSize);
 	receivedSecs.set(secIdx);
 	curLen += payloadSize;
 

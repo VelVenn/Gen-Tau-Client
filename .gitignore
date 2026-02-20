@@ -112,6 +112,7 @@ Testing/
 .github/
 .cache/
 
+*.code-workspace
 *.qmlls.ini
 
 # Build output

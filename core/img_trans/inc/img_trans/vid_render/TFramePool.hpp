@@ -33,14 +33,21 @@ class [[gnu::aligned(64)]] TFramePool
 		u32         frameLen = 0;
 
 	  public:
-		u8* data() { return frame->data(); }
+		u8* data() noexcept
+		{
+			if (!isValid()) { return nullptr; }
+			return frame->data();
+		}
 		u32 index() const noexcept { return idx; }
 
 		u32  getDataLen() const noexcept { return frameLen; }
 		void setDataLen(u32 len) noexcept { frameLen = len; }
 
 	  public:
-		bool isValid() const { return pool != nullptr && frame != nullptr && idx < poolSize; }
+		bool isValid() const noexcept
+		{
+			return pool != nullptr && frame != nullptr && idx < poolSize;
+		}
 
 	  public:
 		FrameData(TFramePool* _pool, Frame* _frame, u32 _idx) :
