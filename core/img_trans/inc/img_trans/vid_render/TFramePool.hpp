@@ -15,7 +15,7 @@ class [[gnu::aligned(64)]] TFramePool
 {
   public:
 	static constexpr u32 poolSize = 10;
-	static constexpr u32 slotLen  = 2 * 1024 * 1024;  // 2MB per slot
+	static constexpr u32 slotLen  = 2 * 1024 * 1024;  // 2 MiB per slot
 
   public:
 	using SharedPtr   = std::shared_ptr<TFramePool>;

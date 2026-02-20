@@ -71,8 +71,8 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
   public:
 	static constexpr u32 maxReAsmSlots   = 5;
 	static constexpr u32 maxPayloadSize  = MTU_LEN - sizeof(Header);
-	static constexpr u32 maxSecPerFrame  = 1536;
-	static constexpr u32 bigFrameThres   = 5000;
+	static constexpr u32 maxSecPerFrame  = 1536;  // 1536 = 64 * 24, 1536 * 1392 ~= 2.04 MiB
+	static constexpr u32 bigFrameThres   = 5000;  // 5 KB
 	static constexpr i16 minFrameIdxDiff = -180;  // About 3 seconds, assuming 60 FPS
 
 	static constexpr std::chrono::milliseconds reassembleTimeout{ 70 };
@@ -85,7 +85,7 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
 		u16                                  frameIdx     = 0;
 		u32                                  curLen       = 0;
 		TimePoint                            asmStartTime = TimePoint::min();
-		std::bitset<maxSecPerFrame>          receivedSecs;
+		std::bitset<maxSecPerFrame>          receivedSecs; // bitmap is based on uint64_t array
 
 		void clear() noexcept
 		{
