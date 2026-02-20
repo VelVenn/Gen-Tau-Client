@@ -3,6 +3,8 @@ leak:libqgtk3
 leak:libpango
 # leak:libgobject
 
+leak:libvidstab.so
+# leak:libva.so
 leak:libcuda.so
 leak:libvulkan.so
 leak:libtheoraenc.so
