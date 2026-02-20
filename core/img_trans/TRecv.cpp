@@ -8,6 +8,7 @@
 #include <cerrno>
 
 #include <array>
+#include <chrono>
 #include <future>
 #include <stop_token>
 #include <system_error>
@@ -77,29 +78,69 @@ int TRecv::start()
 			RecvBuf() { memset(packet.data(), 0, MTU_LEN); }
 		} recvBuffer;
 
+		i32           ENOMEM_count = 0;
+		constexpr i32 ENOMEM_THRES = 5;
+
 		while (!sToken.stop_requested()) {
 			auto ret = ::recv(updSock, recvBuffer.data(), MTU_LEN, 0);
 
 			if (ret > 0) {
+				ENOMEM_count = 0;  // Reset ENOMEM counter on successful receive
+
 				lastRecvTime.store(chrono::steady_clock::now());
 
 				reassembler->onPacketRecv(std::span(recvBuffer.packet).subspan(0, ret), {});
 			} else if (ret == 0) {
-				// tImgTransLogTrace("Received empty packet");
+				ENOMEM_count = 0;  // ret == 0 indicates zero-length packet in UDP (DGRAM sock)
+
 				continue;
 			} else {
-				if (errno == EAGAIN || errno == EWOULDBLOCK) {
+				if (errno == EAGAIN || errno == EWOULDBLOCK) [[likely]] {
 					reassembler->onRecvTimeoutScan({});
 					continue;  // Timeout, just try again
-				} else {
-					onRecvError(errno);
+				}
 
-					tImgTransLogError(
-						"Error receiving data, error: {}",
+				if (errno == ENOMEM) {
+					ENOMEM_count++;
+					tImgTransLogWarn(
+						"Receive failed with ENOMEM (kernel socket buffer out of memory), "
+						"consecutive count: {}.",
+						ENOMEM_count
+					);
+
+					if (ENOMEM_count > ENOMEM_THRES) {
+						onRecvError(errno);
+						tImgTransLogError(
+							"Receive failed with ENOMEM {} times in a row. Stopping recieve "
+							"thread.",
+							ENOMEM_count
+						);
+						break;
+					}
+
+					this_thread::sleep_for(chrono::milliseconds(ENOMEM_count));
+					continue;
+				}
+
+				if (errno == EINTR) {
+					tImgTransLogWarn("Recieve interrupted by a system signal");
+					continue;  // Interrupted by signal, just try again
+				}
+
+				if (errno == ECONNREFUSED || errno == ENOTCONN) [[unlikely]] {
+					tImgTransLogWarn(
+						"Recieve failed with error: {}, ignoring this",
 						error_code(errno, system_category()).message()
 					);
-					break;
+					continue;  // These errors should not happen as there is no connection and send at all
 				}
+
+				tImgTransLogError(
+					"Receive failed with error: {}. Stopping receive thread.",
+					error_code(errno, system_category()).message()
+				);
+				onRecvError(errno);
+				break;
 			}
 		}
 
