@@ -127,8 +127,11 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	std::jthread busThread;
 
   public:
-	u64  getMaxBufferBytes() const { return maxBufferBytes.load(); }    // MT-SAFE
-	void setMaxBufferBytes(u64 bytes) { maxBufferBytes.store(bytes); }  // MT-SAFE
+	// MT-SAFE
+	u64 getMaxBufferBytes() const { return maxBufferBytes.load(); }
+
+	// MT-SAFE, but should be used with caution as it may cause pushFrame to fail if set too low.
+	void setMaxBufferBytes(u64 bytes) { maxBufferBytes.store(bytes); }
 
 	// MT-SAFE
 	TimePoint getLastPushSuccessTime() const { return lastPushSuccess.load(); }
@@ -224,6 +227,11 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	StateType getCurrentState();
 
   public:
+	/**
+	 * @brief: Link the video output sink to a QQuickItem. This method MUST be called before
+	 *         the pipeline is set to playing state.
+	 * @note: NOT MT-SAFE!
+	 */
 	void linkSinkWidget(QQuickItem* widget);
 
   public:
