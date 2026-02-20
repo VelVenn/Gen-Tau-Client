@@ -105,7 +105,7 @@ auto TReassembly::findReAsmSlot(u16 idx) -> ReassemblingFrame*
 	return nullptr;
 }
 
-void TReassembly::onPacketRecv(std::span<u8> packetData)
+void TReassembly::onPacketRecv(std::span<u8> packetData, TRecvPasskey)
 {
 	auto now = chrono::steady_clock::now();
 	if (synced.load() && now - lastSyncedTime.load() > syncTimeout) {
@@ -168,7 +168,7 @@ void TReassembly::onPacketRecv(std::span<u8> packetData)
 	}
 
 	if (!rSlot->isOccupied()) {
-		auto frameDataOpt = renderer->acquireFrameSlot();
+		auto frameDataOpt = renderer->acquireFrameSlot({});
 		if (!frameDataOpt.has_value()) { return; }
 
 		rSlot->frameSlot = std::move(frameDataOpt).value();
@@ -180,7 +180,7 @@ void TReassembly::onPacketRecv(std::span<u8> packetData)
 
 	if (rSlot->fill(packetData, header)) {
 		if (rSlot->isComplete()) {
-			renderer->tryPushFrame(rSlot->steal());
+			renderer->tryPushFrame(rSlot->steal(), {});
 			lastPushedIdx.store(header->frameIdx);
 
 			for (auto& frame : rFrames) {
@@ -193,7 +193,7 @@ void TReassembly::onPacketRecv(std::span<u8> packetData)
 	}
 };
 
-void TReassembly::onRecvTimeoutScan()
+void TReassembly::onRecvTimeoutScan(TRecvPasskey)
 {
 	auto now = chrono::steady_clock::now();
 

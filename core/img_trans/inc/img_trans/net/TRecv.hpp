@@ -151,6 +151,13 @@ class TRecv
 	}
 
   public:
+	/**
+	 * @brief: Constructor of TRecv.
+	 * @param _reassembler: A shared pointer to a TReassembly who is used for reassembling received packets.
+	 * @param _port: The port to listen on.
+	 * @param _ip: The IP address to bind to, only accept dotted-decimal notation.
+	 * @throws: std::invalid_argument if reassembler is nullptr.
+	 */
 	explicit TRecv(
 		TReassembly::SharedPtr _reassembler, u16 _port = 3334, const char* _ip = "127.0.0.1"
 	);
@@ -158,7 +165,10 @@ class TRecv
 
 	/**
 	 * @brief: create a unique pointer to TRecv instance. 
-	 *
+	 * @param reassembler: A shared pointer to a TReassembly who is used for reassembling received packets.
+	 * @param port: The port to listen on.
+	 * @param ip: The IP address to bind to, only accept dotted-decimal notation (e.g., "127.0.0.1").
+	 * @return: A unique pointer to the created TRecv instance.
 	 * @throws: std::invalid_argument if reassembler is nullptr.
 	 */
 	[[nodiscard("Should not ignored the created TRecv::UniPtr")]] static UniPtr createUni(
@@ -170,7 +180,10 @@ class TRecv
 
 	/**
 	 * @brief: create a shared pointer to TRecv instance. 
-	 *
+	 * @param reassembler: A shared pointer to a TReassembly who is used for reassembling received packets.
+	 * @param port: The port to listen on.
+	 * @param ip: The IP address to bind to, only accept dotted-decimal notation (e.g., "127.0.0.1").
+	 * @return: A shared pointer to the created TRecv instance.
 	 * @throws: std::invalid_argument if reassembler is nullptr.
 	 */
 	[[nodiscard("Should not ignored the created TRecv::SharedPtr")]] static SharedPtr createShared(

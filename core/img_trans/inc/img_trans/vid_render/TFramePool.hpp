@@ -95,7 +95,7 @@ class [[gnu::aligned(64)]] TFramePool
 	};
 
   private:
-	Pool        pool;
+	Pool        poolData;
 	FreeIdxList freeIdxList;
 
   public:
@@ -103,7 +103,7 @@ class [[gnu::aligned(64)]] TFramePool
 	{
 		u32 idx;
 		if (!freeIdxList.try_dequeue(idx)) { return std::nullopt; }
-		return FrameData(this, &pool[idx], idx);
+		return FrameData(this, &poolData[idx], idx);
 	}
 
   private:
@@ -115,9 +115,9 @@ class [[gnu::aligned(64)]] TFramePool
 	}
 
   public:
-	TFramePool() : pool(), freeIdxList(poolSize)
+	TFramePool() : poolData(), freeIdxList(poolSize)
 	{
-		std::memset(pool.data(), 0, sizeof(pool));
+		std::memset(poolData.data(), 0, sizeof(poolData));
 
 		for (u32 i = 0; i < poolSize; i++) { freeIdxList.try_enqueue(i); }
 	}

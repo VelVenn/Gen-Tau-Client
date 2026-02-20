@@ -83,13 +83,13 @@ int TRecv::start()
 			if (ret > 0) {
 				lastRecvTime.store(chrono::steady_clock::now());
 
-				reassembler->onPacketRecv(std::span(recvBuffer.packet).subspan(0, ret));
+				reassembler->onPacketRecv(std::span(recvBuffer.packet).subspan(0, ret), {});
 			} else if (ret == 0) {
 				// tImgTransLogTrace("Received empty packet");
 				continue;
 			} else {
 				if (errno == EAGAIN || errno == EWOULDBLOCK) {
-					reassembler->onRecvTimeoutScan();
+					reassembler->onRecvTimeoutScan({});
 					continue;  // Timeout, just try again
 				} else {
 					onRecvError(errno);

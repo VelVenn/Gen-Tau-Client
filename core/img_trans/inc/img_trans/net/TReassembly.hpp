@@ -16,6 +16,14 @@
 namespace gentau {
 constexpr u64 MTU_LEN = 1400;  // 1400 B
 
+class TRecv;
+
+class TRecvPasskey
+{
+	friend class TRecv;
+	TRecvPasskey() = default;
+};
+
 class TReassembly : public std::enable_shared_from_this<TReassembly>
 {
   public:
@@ -36,16 +44,27 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
 		u16 secIdx;
 		u32 frameLen;
 
+		/**
+		 * @brief: Calculate the difference between two frame indices, considering wrap-around.
+		 * @return: The signed difference between idx_a and idx_b. Positive if idx_a is after 
+		 *          idx_b, negative if idx_a is before idx_b, zero if they are the same.
+		 */
 		static constexpr i16 diff(u16 idx_a, u16 idx_b) noexcept
 		{
 			return static_cast<i16>(idx_a - idx_b);
 		}
 
+		/**
+		 * @brief: Check if idx_a is after idx_b, considering wrap-around.
+		 */
 		static constexpr bool isAfter(u16 idx_a, u16 idx_b) noexcept
 		{
 			return diff(idx_a, idx_b) > 0;
 		}
 
+		/**
+		 * @brief: Check if idx_a is before idx_b, considering wrap-around.
+		 */
 		static constexpr bool isBefore(u16 idx_a, u16 idx_b) noexcept
 		{
 			return diff(idx_a, idx_b) < 0;
@@ -85,7 +104,7 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
 		u16                                  frameIdx     = 0;
 		u32                                  curLen       = 0;
 		TimePoint                            asmStartTime = TimePoint::min();
-		std::bitset<maxSecPerFrame>          receivedSecs; // bitmap is based on uint64_t array
+		std::bitset<maxSecPerFrame>          receivedSecs;  // bitmap is based on uint64_t array
 
 		void clear() noexcept
 		{
@@ -138,22 +157,57 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
 
   public:
 	/**
-	 * @brief: Handle a received packet.
-	 * 
-	 * @param packetData: The raw packet data to be processed. The span must only contain 
-	 *                    the valid data received, and should not include any extra padding.
-	 * @note: NOT MT-SAFE! Should be called from a single thread synchronously.
+	 * @brief: 获取上一次网络连接同步成功（即收到有效包）的时间点。若未曾成功同步过，返回 TimePoint::min()。
+	 * @note: 多线程安全。
 	 */
-	void onPacketRecv(std::span<u8> packetData);
-	void onRecvTimeoutScan();
+	TimePoint getLastSyncedTime() const noexcept { return lastSyncedTime.load(); }
+
+	/**
+	 * @brief: 获取上一次推送到渲染管线的帧索引。若从未推送过任何帧，返回 0。
+	 * @note: 多线程安全。
+	 */
+	u16 getLastPushedIdx() const noexcept { return lastPushedIdx.load(); }
+
+	/**
+	 * @brief: 检查当前是否处于网络连接同步状态（即是否持续收到有效包）。
+	 * @note: 多线程安全。
+	 */
+	bool isSynced() const noexcept { return synced.load(); }
+
+  public:
+	/**
+	 * @brief: 处理接收到的原始数据包。
+	 * @param packetData: 接收到的包含协议头部的原始数据包内容，除此自外不能包含任何额外的填充字节。
+	 * @note: 该方法仅能在 TRecv 类内部被正常调用，其他地方调用此方法将导致编译错误。该方法当且仅当
+	 *        存在单一调用者时才是线程安全的，请勿在多个线程中并发调用此方法。
+	 */
+	void onPacketRecv(std::span<u8> packetData, TRecvPasskey);
+
+	/**
+	 * @brief: 检查同步状态。扫描当前正在重组的帧，检查是否有重组超时的帧，并进行相应的处理。
+	 * @note: 该方法仅能在 TRecv 类内部被正常调用，其他地方调用此方法将导致编译错误。该方法当且仅当
+	 *        存在单一调用者时才是线程安全的，请勿在多个线程中并发调用此方法。
+	 */
+	void onRecvTimeoutScan(TRecvPasskey);
 
   private:
 	ReassemblingFrame* findReAsmSlot(u16 frameIdx);
 
   public:
+	/**
+	 * @brief: constructor of TReassembly.
+	 * @throw: std::invalid_argument if the provided TVidRender::SharedPtr is nullptr.
+	 */
 	explicit TReassembly(TVidRender::SharedPtr _renderer);
 
-	SharedPtr create(TVidRender::SharedPtr _renderer)
+	/**
+	 * @brief: create a shared pointer to TReassembly instance. 
+	 * @throw: std::invalid_argument if the provided TVidRender::SharedPtr is nullptr.
+	 */
+
+	[[nodiscard("Should not ignored the created TReassembly::SharedPtr")]] static SharedPtr create(
+		TVidRender::SharedPtr _renderer
+	)
 	{
 		return std::make_shared<TReassembly>(std::move(_renderer));
 	}

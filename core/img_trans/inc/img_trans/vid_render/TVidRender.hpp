@@ -25,6 +25,14 @@ extern "C"
 }
 
 namespace gentau {
+class TReassembly;
+
+class TReassemblyPasskey
+{
+	friend class TReassembly;
+	TReassemblyPasskey() = default;
+};
+
 class TVidRender : public std::enable_shared_from_this<TVidRender>
 {
   public:
@@ -141,32 +149,31 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 
   public:
 	/**
-	 * @brief: Try to push a frame into the pipeline.
-	 * @return: true if the frame is successfully pushed.
-	 * @note: NOT MT-SAFE! Strongly recommend to call this from the main thread 
-	 * 		  or the thread that created the TVidRender instance. DO NOT call 
-	 *        this method if you are calling tryPushFrame(TFramePool::FrameData) 
-	 *        already.
+	 * @brief: 尝试推送一帧数据到渲染管道中。
+	 * @return: 在帧数据成功推送到管道返回 true，否则返回 false。
+	 * @note: 该方法仅适用于测试目的，非 Debug 构建中调用此方法永远返回 false。该方法
+	 *        当且仅当存在单一调用者时才是线程安全的，请勿在多个线程中并发调用次方法。通
+	 *        过 TImgTrans 使用 TVidRender 时，请永远不要直接调用此方法。
 	 */
 	bool tryPushFrame(FramePtr frame);
 
 	/**
-	 * @brief: Try to push a frame into the pipeline.
-	 * @return: true if the frame is successfully pushed.
-	 * @note: MT-SAFE only when there is SINGLE caller. DO NOT call this method 
-	 *        concurrently from multiple threads, or it may cause race condition.
-	 *        DO NOT call tryPushFrame(FramePtr) if you are calling this method 
-	 *        already.
+	 * @brief: 尝试推送一帧数据到渲染管道中。
+	 * @return: 在帧数据成功推送到管道返回 true，否则返回 false。
+	 * @note: 该方法仅能在 TReassembly 类内部被正常调用，其他地方调用此方法将导致编译
+	 *        错误。该方法当且仅当存在单一调用者时才是线程安全的，请勿在多个线程中并发调
+	 *        用此方法。
 	 */
-	bool tryPushFrame(TFramePool::FrameData&& frame);
+	bool tryPushFrame(TFramePool::FrameData&& frame, TReassemblyPasskey);
 
 	/**
-	 * @brief: Acquire a frame slot from the frame pool.
-	 * @return: An optional TFramePool::FrameData. 
-	 * @note: MT-SAFE only when there is SINGLE caller. DO NOT call this method 
-	 *        concurrently from multiple threads, or it may cause race condition.
+	 * @brief: 尝试获取一个可用的帧数据槽位。
+	 * @return: std::optional<TFramePool::FrameData> 
+	 * @note: 该方法仅能在 TReassembly 类内部被正常调用，其他地方调用此方法将导致编译
+	 *        错误。该方法当且仅当存在单一调用者时才是线程安全的，请勿在多个线程中并发调
+	 *        用此方法。
 	 */
-	auto acquireFrameSlot() { return framePool.acquire(); }
+	auto acquireFrameSlot(TReassemblyPasskey) { return framePool.acquire(); }
 
   public:
 	/** 
@@ -259,6 +266,11 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 		return std::make_shared<TVidRender>(_maxBufferBytes);
 	}
 
+	/**
+	 * @brief: Initialize the GStreamer context. Must be called before creating any TVidRender instance.
+	 * @param argc: Pointer to the argc parameter from the main function.
+	 * @param argv: Pointer to the argv parameter from the main function.
+	 */
 	static void initContext(int* argc, char** argv[]);
 
 	~TVidRender();

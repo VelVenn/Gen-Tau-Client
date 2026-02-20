@@ -461,6 +461,14 @@ TVidRender::~TVidRender()
 
 bool TVidRender::tryPushFrame(TVidRender::FramePtr frame)
 {
+	if constexpr (!conf::TDebugMode) {
+		tImgTransLogError(
+			"TVidRender::tryPushFrame(TVidRender::FramePtr) method is only for "
+			"testing purpose and should not be called in non-Debug builds."
+		);
+		return false;
+	}
+
 	if (!fixedPipe || !fixedSrc) {
 		tImgTransLogError("Push frame failed: Pipeline is not initialized.");
 		return false;
@@ -510,7 +518,7 @@ bool TVidRender::tryPushFrame(TVidRender::FramePtr frame)
 	return false;
 }
 
-bool TVidRender::tryPushFrame(TFramePool::FrameData&& frame)
+bool TVidRender::tryPushFrame(TFramePool::FrameData&& frame, TReassemblyPasskey)
 {
 	if (!fixedPipe || !fixedSrc) {
 		tImgTransLogError("Push frame failed: Pipeline is not initialized.");
@@ -538,7 +546,7 @@ bool TVidRender::tryPushFrame(TFramePool::FrameData&& frame)
 	}
 
 	GstBuffer* buffer = gst_buffer_new_wrapped_full(
-		static_cast<GstMemoryFlags>(0), // Standard buffer, can be writable(?)
+		static_cast<GstMemoryFlags>(0),  // Standard buffer, can be writable(?)
 		frameDataPtr->data(),
 		TFramePool::slotLen,
 		0,
