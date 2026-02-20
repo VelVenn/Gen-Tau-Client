@@ -10,6 +10,7 @@
 #include <QQuickWindow>
 #include <QRunnable>
 
+#include <exception>
 #include <memory>
 
 using namespace gentau;
@@ -63,7 +64,14 @@ int main(int argc, char* argv[])
 	QGuiApplication app(argc, argv);  // QGuiApplication 必须先于 TimgTrans 创建
 	QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
 
-	auto testTrans = TImgTrans::create();
+	TImgTrans::SharedPtr testTrans;
+
+	try {
+		testTrans = TImgTrans::create();
+	} catch (const std::exception& e) {
+		tLogCritical("Fatal error during img trans init: {}", e.what());
+		return -1;
+	}
 
 	QQmlApplicationEngine engine;
 	QObject::connect(
