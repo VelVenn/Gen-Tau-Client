@@ -1,6 +1,6 @@
 #include <qquickwindow.h>
 
-#include "img_trans/vid_render/TVidRender.hpp"
+#include "img_trans/TImgTrans.hpp"
 #include "utils/TLog.hpp"
 
 #include <QGuiApplication>
@@ -53,18 +53,18 @@ class VideoController : public QObject
 class RunningTask : public QRunnable
 {
   public:
-	RunningTask(shared_ptr<TVidRender> pipe_data) : m_sender(pipe_data) {}
+	RunningTask(shared_ptr<TImgTrans> imgTrans) : imgTrans(imgTrans) {}
 	~RunningTask() override = default;
 
-	void run() override { m_sender->play(); }
+	void run() override { imgTrans->renderer->play(); }
 
   private:
-	shared_ptr<TVidRender> m_sender;
+	shared_ptr<TImgTrans> imgTrans;
 };
 
 int main(int argc, char *argv[])
 {
-	gentau::TVidRender::initContext(&argc, &argv);
+	gentau::TImgTrans::initContext(&argc, &argv);
 
 	// qputenv("QSG_RENDER_TIMING", "1");  // 启用渲染时间测量
 	// qputenv("QSG_RENDER_LOOP", "basic");                  // 强制基础渲染循环
@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
 	QGuiApplication app(argc, argv);
 	QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
 
-	auto vidRenderer = TVidRender::create("./res/raw_lg_4k_60fps.h265");
+	auto imgTrans = TImgTrans::create();
 
 	QQmlApplicationEngine engine;
 	QObject::connect(
@@ -95,17 +95,19 @@ int main(int argc, char *argv[])
 		[]() { QCoreApplication::exit(-1); },
 		Qt::QueuedConnection
 	);
-	VideoController controller(vidRenderer);
+	VideoController controller(imgTrans->renderer);
 	engine.rootContext()->setContextProperty("videoController", &controller);
 	engine.loadFromModule("Gentau.Test.Render.StatusChange", "StatusTest");
 
 	auto rootObject = static_cast<QQuickWindow *>(engine.rootObjects().first());
 	auto videoItem  = rootObject->findChild<QQuickItem *>("videoItem");
-	vidRenderer->linkSinkWidget(videoItem);
+	imgTrans->renderer->linkSinkWidget(videoItem);
 
 	rootObject->scheduleRenderJob(
-		new RunningTask(vidRenderer), QQuickWindow::BeforeSynchronizingStage
+		new RunningTask(imgTrans), QQuickWindow::BeforeSynchronizingStage
 	);
+
+	imgTrans->receiver->start(); 
 
 	return app.exec();
 }
