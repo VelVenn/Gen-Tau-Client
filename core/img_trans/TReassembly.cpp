@@ -195,35 +195,49 @@ void TReassembly::onPacketRecv(std::span<u8> packetData, TRecvPasskey)
 			renderer->tryPushFrame(rSlot->steal(), {});
 			lastPushedIdx.store(header->frameIdx);
 
-			for (auto& frame : rFrames) {
-				if ((frame.isOccupied() && Header::isBefore(frame.frameIdx, header->frameIdx)) ||
-					frame.frameIdx == header->frameIdx) {
-					frame.clear();
-				}
-			}
+			rSlot->clear();  // Reset metadata, the actual frame has been moved.
+
+			// for (auto& frame : rFrames) {
+			// 	if ((frame.isOccupied() && Header::isBefore(frame.frameIdx, header->frameIdx)) ||
+			// 		frame.frameIdx == header->frameIdx) {
+			// 		frame.clear();
+			// 	}
+			// }
+
+			// Note: 这里的激进清理可能会导致一些边缘情况的帧被过早丢弃，暂时先不启用。
+			// 找重组槽位时的抢占式清理与重组超时检查已经能够在大多数情况下保证僵尸帧不
+			// 会过多积累，且不会过早丢弃正常帧。
 		}
 	}
 };
 
-void TReassembly::onRecvTimeoutScan(TRecvPasskey)
+void TReassembly::ReAsmSlotScan(TRecvPasskey)
 {
 	auto now = chrono::steady_clock::now();
 
 	if (synced.load() && now - lastSyncedTime.load() > syncTimeout) {
-		tImgTransLogWarn("Sync timeout detected on recieving packet timeout.");
+		tImgTransLogWarn("Sync timeout detected on reassembling frame slot scan.");
 		synced.store(false);
 	}
 
 	for (auto& frame : rFrames) {
+		// 检查重组超时的帧
 		if (frame.isOccupied() && now - frame.asmStartTime > reassembleTimeout) {
-			frame.clear();
-			continue;
-		}
+			if (pushIncompleteAllowed() && frame.getCompleteRate() >= minFrameCompleteRate) {
+				if (Header::isAfter(frame.frameIdx, lastPushedIdx.load())) {
+					renderer->tryPushFrame(frame.steal(), {});
+					lastPushedIdx.store(frame.frameIdx);
+				}
 
-		// if (frame.isComplete() && Header::isAfter(frame.frameIdx, lastPushedIdx.load())) {
-		// 	renderer->tryPushFrame(frame.steal());
-		// 	lastPushedIdx.store(frame.frameIdx);
-		// }
+				// tImgTransLogTrace("Trying to push corrupted frame...");
+
+				// 能在这里扫描的都是通过 onPacketRecv 的 frameIdxDiff 的严判的，所有这里只用检查
+				// 是否比 lastPushedIdx 大即可，防止出现 push 了一个更旧的帧导致画面出现回退。
+			}
+
+			// 无论是否推送，都清理掉这个重组槽位，防止僵尸帧过多积累导致后续帧无法重组。
+			frame.clear();
+		}
 	}
 }
 }  // namespace gentau

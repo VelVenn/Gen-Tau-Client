@@ -82,7 +82,16 @@ int TRecv::start()
 		i32           ENOMEM_count = 0;
 		constexpr i32 ENOMEM_THRES = 5;
 
+		auto           lastReAsmScanTime = chrono::steady_clock::now();
+		constexpr auto reAsmScanInv      = 5ms;
+
 		while (!sToken.stop_requested()) {
+			auto now = chrono::steady_clock::now();
+			if (now - lastReAsmScanTime > reAsmScanInv) {
+				reassembler->ReAsmSlotScan({});
+				lastReAsmScanTime = now;
+			}
+
 			auto ret = ::recv(updSock, recvBuffer.data(), MTU_LEN, 0);
 
 			if (ret > 0) {
@@ -97,7 +106,6 @@ int TRecv::start()
 				continue;
 			} else {
 				if (errno == EAGAIN || errno == EWOULDBLOCK) [[likely]] {
-					reassembler->onRecvTimeoutScan({});
 					continue;  // Timeout, just try again
 				}
 

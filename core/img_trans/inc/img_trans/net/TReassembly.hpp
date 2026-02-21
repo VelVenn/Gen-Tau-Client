@@ -88,13 +88,15 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
 	static_assert(sizeof(Header) == 8, "Header size must be 8 bytes");
 
   public:
-	static constexpr u32 maxReAsmSlots   = 5;
-	static constexpr u32 maxPayloadSize  = MTU_LEN - sizeof(Header);
-	static constexpr u32 maxSecPerFrame  = 1536;  // 1536 = 64 * 24, 1536 * 1392 ~= 2.04 MiB
-	static constexpr u32 bigFrameThres   = 5000;  // 5 KB
-	static constexpr i16 minFrameIdxDiff = -180;  // About 3 seconds, assuming 60 FPS
+	static constexpr u32 maxReAsmSlots        = 5;
+	static constexpr u32 maxPayloadSize       = MTU_LEN - sizeof(Header);
+	static constexpr u32 maxSecPerFrame       = 1536;   // 1536 = 64 * 24, 1536 * 1392 ~= 2.04 MiB
+	static constexpr u32 bigFrameThres        = 5000;   // 5 KB
+	static constexpr i16 minFrameIdxDiff      = -180;   // About 3 seconds, assuming 60 FPS
+	static constexpr f32 minFrameCompleteRate = 0.95f;  // Minimum receive data ratio to tolerate
 
-	static constexpr std::chrono::milliseconds reassembleTimeout{ 70 };
+	// About 3.5 frames at 60 FPS
+	static constexpr std::chrono::milliseconds reassembleTimeout{ 60 };
 	static constexpr std::chrono::milliseconds syncTimeout{ 1000 };
 
   private:
@@ -143,6 +145,17 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
 			return curLen == frameSlot.value().getDataLen();
 		}
 
+		f32 getCompleteRate() const noexcept
+		{
+			if (!frameSlot.has_value()) { return 0.0f; }
+
+			if (!frameSlot.value().isValid()) { return 0.0f; }
+
+			if (curLen > frameSlot->getDataLen()) { return 0.0f; }
+
+			return static_cast<f32>(curLen) / static_cast<f32>(frameSlot->getDataLen());
+		}
+
 		bool fill(std::span<u8> packet, const Header* header);
 	};
 
@@ -151,9 +164,10 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
 	std::array<ReassemblingFrame, maxReAsmSlots> rFrames;
 
   private:
-	std::atomic<TimePoint> lastSyncedTime = TimePoint::min();
-	std::atomic<u16>       lastPushedIdx  = 0;
-	std::atomic<bool>      synced         = false;
+	std::atomic<TimePoint> lastSyncedTime      = TimePoint::min();
+	std::atomic<u16>       lastPushedIdx       = 0;
+	std::atomic<bool>      synced              = false;
+	std::atomic<bool>      allowPushIncomplete = false;
 
   public:
 	/**
@@ -174,6 +188,22 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
 	 */
 	bool isSynced() const noexcept { return synced.load(); }
 
+	/**
+	 * @brief: 检查是否允许推送重组未完成的帧到渲染管线。该设置默认为 false。
+	 * @note: 多线程安全。
+	 */
+	bool pushIncompleteAllowed() const noexcept { return allowPushIncomplete.load(); }
+
+	/**
+	 * @brief: 设置是否允许推送重组未完成的帧到渲染管线。该设置默认为 false。
+	 * @note: 多线程安全。开启后有较大概率导致花屏，但可以保证画面最大程度的不出现卡顿。
+	 *        仅建议在网络状况极差且对渲染完整性要求不高的情况下开启。请务必谨慎使用该设置。
+	 * @note: 该 API 目前仅在 nVidia decoder 测试过，其他硬解码器的表现可能会有较大差异，
+	 *        有可能会导致严重问题。软解码器由于本身的容错机制，开启该设置一般不会有明显的负面
+	 *        影响，但不做绝对保证。
+	 */
+	void allowPushIncompleteFrames(bool allow) noexcept { allowPushIncomplete.store(allow); }
+
   public:
 	/**
 	 * @brief: 处理接收到的原始数据包。
@@ -188,7 +218,7 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
 	 * @note: 该方法仅能在 TRecv 类内部被正常调用，其他地方调用此方法将导致编译错误。该方法当且仅当
 	 *        存在单一调用者时才是线程安全的，请勿在多个线程中并发调用此方法。
 	 */
-	void onRecvTimeoutScan(TRecvPasskey);
+	void ReAsmSlotScan(TRecvPasskey);
 
   private:
 	ReassemblingFrame* findReAsmSlot(u16 frameIdx);
