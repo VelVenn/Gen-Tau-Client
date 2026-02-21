@@ -1,7 +1,10 @@
 #include "img_trans/net/TReassembly.hpp"
 
 #include "img_trans/vid_render/TFramePool.hpp"
+
 #include "utils/TLog.hpp"
+
+#include "conf/version.hpp"
 
 #include <chrono>
 #include <cstring>
@@ -15,10 +18,19 @@ using namespace std::literals;
 namespace gentau {
 TReassembly::TReassembly(TVidRender::SharedPtr _renderer) : renderer(std::move(_renderer))
 {
-	if (renderer == nullptr) {
-		constexpr auto errMsg = "Renderer cannot be nullptr"sv;
-		tImgTransLogError("{}", errMsg);
-		throw std::invalid_argument(errMsg.data());
+	if constexpr (!conf::TDebugMode) {
+		if (renderer == nullptr) {
+			constexpr auto errMsg = "Renderer cannot be nullptr"sv;
+			tImgTransLogError("{}", errMsg);
+			throw std::invalid_argument(errMsg.data());
+		}
+	} else {
+		if (!renderer) {
+			tImgTransLogWarn(
+				"Renderer is nullptr, this is allowed in Debug build for testing purposes, but may "
+				"cause some features to not work properly. Use with caution."
+			);
+		}
 	}
 }
 

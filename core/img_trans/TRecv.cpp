@@ -11,6 +11,7 @@
 #include <chrono>
 #include <future>
 #include <stop_token>
+#include <string_view>
 #include <system_error>
 #include <thread>
 
@@ -200,7 +201,18 @@ i32 TRecv::bindV4(u16 port, const char* ip)
 TRecv::TRecv(TReassembly::SharedPtr _reassembler, u16 _port, const char* _ip) :
 	reassembler(std::move(_reassembler))
 {
-	if (!reassembler) { throw std::invalid_argument("Reassembler pointer cannot be null"); }
+	if (!reassembler) {
+		if constexpr (!conf::TDebugMode) {
+			constexpr auto errMsg = "Reassembler cannot be nullptr"sv;
+			tImgTransLogError("{}", errMsg);
+			throw std::invalid_argument(errMsg.data());
+		} else {
+			tImgTransLogWarn(
+				"Reassembler is nullptr, this is allowed in Debug build for testing purposes, but "
+				"may cause some features to not work properly. Use with caution."
+			);
+		}
+	}
 
 	auto bindResult = bindV4(_port, _ip);
 	if (bindResult != 0) {

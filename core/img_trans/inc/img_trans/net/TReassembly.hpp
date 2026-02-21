@@ -196,13 +196,15 @@ class TReassembly : public std::enable_shared_from_this<TReassembly>
   public:
 	/**
 	 * @brief: constructor of TReassembly.
-	 * @throw: std::invalid_argument if the provided TVidRender::SharedPtr is nullptr.
+	 * @throw: std::invalid_argument if the provided TVidRender::SharedPtr is nullptr
+	 *         in Non-Debug build.
 	 */
 	explicit TReassembly(TVidRender::SharedPtr _renderer);
 
 	/**
 	 * @brief: create a shared pointer to TReassembly instance. 
-	 * @throw: std::invalid_argument if the provided TVidRender::SharedPtr is nullptr.
+	 * @throw: std::invalid_argument if the provided TVidRender::SharedPtr is nullptr
+	 *         in Non-Debug build.
 	 */
 
 	[[nodiscard("Should not ignored the created TReassembly::SharedPtr")]] static SharedPtr create(
