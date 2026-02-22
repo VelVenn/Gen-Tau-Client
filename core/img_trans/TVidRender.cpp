@@ -7,10 +7,7 @@
 #include "utils/TLogical.hpp"
 
 #include <gst/app/app.h>
-#include <gst/app/gstappsrc.h>
 #include <gst/gst.h>
-#include <gst/gstenumtypes.h>
-#include <gst/gstmemory.h>
 
 #include <exception>
 #include <future>
@@ -561,11 +558,14 @@ bool TVidRender::tryPushFrame(TFramePool::FrameData&& frame, TReassemblyPasskey)
 		if (ret == GST_FLOW_OK) {
 			lastPushSuccess.store(chrono::steady_clock::now());
 			return true;
-		} else {
-			tImgTransLogError(
-				"Failed to push buffer to appsrc, flow return: {}", gst_flow_get_name(ret)
-			);
 		}
+
+		// else {
+		// 	tImgTransLogError(
+		// 		"Failed to push buffer to appsrc, flow return: {}", gst_flow_get_name(ret)
+		// 	);
+		// }
+		// Push failure is not a critical error, just skip it and wait for next frame, avoiding log spam.
 	}
 
 	return false;

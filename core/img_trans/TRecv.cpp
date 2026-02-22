@@ -2,8 +2,6 @@
 
 #include "utils/TLog.hpp"
 
-#include <asm-generic/socket.h>
-#include <sys/socket.h>
 #include <unistd.h>
 #include <cerrno>
 
@@ -100,12 +98,12 @@ int TRecv::start()
 				lastRecvTime.store(chrono::steady_clock::now());
 
 				reassembler->onPacketRecv(std::span(recvBuffer.packet).subspan(0, ret), {});
-			} else if (ret == 0) {
+			} else if (ret == 0) [[unlikely]] {
 				ENOMEM_count = 0;  // ret == 0 indicates zero-length packet in UDP (DGRAM sock)
 
 				continue;
 			} else {
-				if (errno == EAGAIN || errno == EWOULDBLOCK) [[likely]] {
+				if (errno == EAGAIN || errno == EWOULDBLOCK) {
 					continue;  // Timeout, just try again
 				}
 

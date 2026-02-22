@@ -6,7 +6,7 @@
 #include "utils/TTypeRedef.hpp"
 
 #include <arpa/inet.h>
-#include <bits/types/struct_timeval.h>
+#include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 
