@@ -35,11 +35,13 @@ class TReassemblyPasskey
 
 class TVidRender : public std::enable_shared_from_this<TVidRender>
 {
-  public:
+  private:
 	using FramePtr   = std::unique_ptr<std::vector<u8>>;
 	using ElemRawPtr = GstElement*;
-	using TimePoint  = std::chrono::steady_clock::time_point;
-	using SharedPtr  = std::shared_ptr<TVidRender>;
+
+  public:
+	using TimePoint = std::chrono::steady_clock::time_point;
+	using SharedPtr = std::shared_ptr<TVidRender>;
 
   public:
 	enum class IssueType : u32
@@ -123,6 +125,9 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	std::atomic<TimePoint> lastPushSuccess = TimePoint::min();
 	std::atomic<u64>       maxBufferBytes  = 262'144;  // Default to 256 KB
 
+	const bool useFileSrc;
+	const bool enableTestMode;
+
   private:
 	std::jthread busThread;
 
@@ -154,11 +159,12 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	/**
 	 * @brief: 尝试推送一帧数据到渲染管道中。
 	 * @return: 在帧数据成功推送到管道返回 true，否则返回 false。
-	 * @note: 该方法仅适用于测试目的，非 Debug 构建中调用此方法永远返回 false。该方法
-	 *        当且仅当存在单一调用者时才是线程安全的，请勿在多个线程中并发调用次方法。通
-	 *        过 TImgTrans 使用 TVidRender 时，请永远不要直接调用此方法。
+	 * @note: 该方法仅适用于测试目的，仅在 Debug 构建且 TVidRender::enableTestMode 
+	 *        为 true 时才会执行推送逻辑，其他情况下调用此方法将直接返回 false。
+	 * @note: 该方法当且仅当存在单一调用者时才是线程安全的，请勿在多个线程中并发调用此方法。
 	 */
-	bool tryPushFrame(FramePtr frame);
+	[[deprecated("Never use this for any general purpose")]]
+	bool __TEST_ONLY_tryPushFrame_UNSAFE_WHO_USE_WHO_SB_(FramePtr frame);
 
 	/**
 	 * @brief: 尝试推送一帧数据到渲染管道中。
@@ -237,13 +243,14 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
   public:
 	/** 
 	 * Post a test error to the pipeline, for testing purpose only.
-	 * Only works in Debug builds.
+	 * Only works in Debug builds when TVidRender::enableTestMode is true, 
+	 * otherwise it will do nothing.
 	 */
 	void postTestError();
 
   public:
-	explicit TVidRender(u64 _maxBufferBytes = 262'144);  // Default to 256 KB
-	explicit TVidRender(const char* file_path, u64 _maxBufferBytes = 262'144);
+	explicit TVidRender(u64 _maxBufferBytes = 262'144, bool _enableTestMode = false);  // Default to 256 KB
+	explicit TVidRender(const char* file_path, u64 _maxBufferBytes = 262'144, bool _enableTestMode = false);
 
 	/** 
 	 * @brief: create a shared pointer to TVidRender instance. 

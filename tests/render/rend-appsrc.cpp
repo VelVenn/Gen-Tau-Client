@@ -1,8 +1,5 @@
 #include <qquickwindow.h>
-#include <climits>
-#include <cstdint>
 
-#include "conf/version.hpp"
 #include "img_trans/vid_render/TVidRender.hpp"
 #include "utils/TLog.hpp"
 
@@ -109,7 +106,7 @@ void MockSender::run()
 
 			if (++postErrOrNot % postErrInv == 0) { renderer->postTestError(); }
 
-			if (renderer->tryPushFrame(std::move(frameData))) {
+			if (renderer->__TEST_ONLY_tryPushFrame_UNSAFE_WHO_USE_WHO_SB_(std::move(frameData))) {
 				// 推送成功，模拟 90KB/s 的节奏
 				// 10K / 90K = 0.111s = 111ms
 				this_thread::sleep_for(chrono::milliseconds(111));
@@ -144,7 +141,7 @@ int main(int argc, char* argv[])
 {
 	gentau::TVidRender::initContext(&argc, &argv);
 
-	// qputenv("QSG_RENDER_TIMING", "1");                    // 启用渲染时间测量
+	// qputenv("QSG_RENDER_TIMING", "1");                    // 启用渲染时间测量 
 	// qputenv("QSG_RENDER_LOOP", "basic");                  // 强制基础渲染循环
 	qputenv("__GL_SYNC_TO_VBLANK", "0");                  // 禁用NVIDIA VSync
 	qputenv("vblank_mode", "0");                          // 禁用Mesa VSync
@@ -163,7 +160,7 @@ int main(int argc, char* argv[])
 	QGuiApplication app(argc, argv);
 	QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
 
-	auto renderer = gentau::TVidRender::create(80 * 1024);
+	auto renderer = make_shared<gentau::TVidRender>(256 * 1024, true);  // 256 KB buffer, test mode enabled
 	auto sender   = make_shared<MockSender>("./res/raw_sintel_720p_stream.h265", renderer);
 
 	QQmlApplicationEngine engine;

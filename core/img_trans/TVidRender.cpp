@@ -427,7 +427,9 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* filePath)
 	return res;
 }
 
-TVidRender::TVidRender(const char* _filePath, u64 _maxBufferBytes)
+TVidRender::TVidRender(const char* _filePath, u64 _maxBufferBytes, bool _enableTestMode) :
+	useFileSrc(true),
+	enableTestMode(_enableTestMode)
 {
 	// Check in compile-time
 	if constexpr (conf::TDebugMode) {
@@ -441,7 +443,9 @@ TVidRender::TVidRender(const char* _filePath, u64 _maxBufferBytes)
 	}
 }
 
-TVidRender::TVidRender(u64 _maxBufferBytes)
+TVidRender::TVidRender(u64 _maxBufferBytes, bool _enableTestMode) :
+	useFileSrc(false),
+	enableTestMode(_enableTestMode)
 {
 	initPipeElements(false);
 	maxBufferBytes.store(_maxBufferBytes);
@@ -456,7 +460,7 @@ TVidRender::~TVidRender()
 	}
 }
 
-bool TVidRender::tryPushFrame(TVidRender::FramePtr frame)
+bool TVidRender::__TEST_ONLY_tryPushFrame_UNSAFE_WHO_USE_WHO_SB_(TVidRender::FramePtr frame)
 {
 	if constexpr (!conf::TDebugMode) {
 		tImgTransLogError(
@@ -468,6 +472,19 @@ bool TVidRender::tryPushFrame(TVidRender::FramePtr frame)
 
 	if (!fixedPipe || !fixedSrc) {
 		tImgTransLogError("Push frame failed: Pipeline is not initialized.");
+		return false;
+	}
+
+	if (!enableTestMode) {
+		tImgTransLogError(
+			"Push frame failed: Test mode is not enabled. This method should only be used for "
+			"testing purposes."
+		);
+		return false;
+	}
+
+	if (useFileSrc) [[unlikely]] {
+		tImgTransLogError("Push frame failed: Source element is not an appsrc.");
 		return false;
 	}
 
@@ -519,6 +536,11 @@ bool TVidRender::tryPushFrame(TFramePool::FrameData&& frame, TReassemblyPasskey)
 {
 	if (!fixedPipe || !fixedSrc) {
 		tImgTransLogError("Push frame failed: Pipeline is not initialized.");
+		return false;
+	}
+
+	if (useFileSrc) [[unlikely]] {
+		tImgTransLogError("Push frame failed: Source element is not an appsrc.");
 		return false;
 	}
 
@@ -700,6 +722,14 @@ void TVidRender::initContext(int* argc, char** argv[])
 void TVidRender::postTestError()
 {
 	if constexpr (conf::TDebugMode) {
+		if (!enableTestMode) {
+			tImgTransLogError(
+				"Cannot post test error: Test mode is not enabled. This method should only be used "
+				"for testing purposes."
+			);
+			return;
+		}
+
 		if (!fixedPipe) { return; }
 
 		g_autoptr(GError) err =
