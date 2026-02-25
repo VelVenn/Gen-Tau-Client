@@ -167,6 +167,8 @@ void TReassembly::onPacketRecv(std::span<u8> packetData, TRecvPasskey)
 		// set to one before current. It's ok to overflow.
 		lastPushedIdx.store(header->frameIdx - 1);
 
+		for (auto& frame : rFrames) { frame.clear(); }  // Clear all reassembly frames when de-sync.
+
 		tImgTransLogDebug("Session synced at frame {}, sec {}.", header->frameIdx, header->secIdx);
 	}
 	lastSyncedTime.store(now);
