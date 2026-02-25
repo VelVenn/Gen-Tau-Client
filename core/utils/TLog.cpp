@@ -27,7 +27,7 @@ static vector<spd::sink_ptr> createSinks()
 		spd::init_thread_pool(8192, 1);
 
 		if constexpr (conf::TLogToFile) {
-#ifdef ___linux___
+#ifdef __linux__
 			auto now_time_t = chrono::zoned_time<chrono::seconds>{
 				chrono::current_zone(), chrono::floor<chrono::seconds>(chrono::system_clock::now())
 			};
