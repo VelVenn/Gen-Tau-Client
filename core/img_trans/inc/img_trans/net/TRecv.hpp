@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <unistd.h>
 
 #include <atomic>
 #include <chrono>
@@ -181,7 +182,7 @@ class TRecv
 	std::optional<V4Addr> getListenAddr() const noexcept
 	{
 		if (!isBound()) { return std::nullopt; }
-		return V4Addr(listenAddr.sin_addr.s_addr, ::ntohs(listenAddr.sin_port));
+		return V4Addr(listenAddr.sin_addr.s_addr, ntohs(listenAddr.sin_port));
 	}
 
   public:

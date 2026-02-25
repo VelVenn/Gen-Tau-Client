@@ -1,6 +1,7 @@
 #include "utils/TLog.hpp"
 
 #include <chrono>
+#include <ctime>
 #include <memory>
 #include <string>
 #include <vector>
@@ -26,12 +27,16 @@ static vector<spd::sink_ptr> createSinks()
 		spd::init_thread_pool(8192, 1);
 
 		if constexpr (conf::TLogToFile) {
+#ifdef ___linux___
 			auto now_time_t = chrono::zoned_time<chrono::seconds>{
 				chrono::current_zone(), chrono::floor<chrono::seconds>(chrono::system_clock::now())
 			};
-
 			auto local_time = now_time_t.get_local_time();
-			auto log_file   = fmt::format("logs/gt_{:%Y%m%d_%H%M%S}.log", local_time);
+#else
+			auto now_time_t = chrono::system_clock::to_time_t(chrono::system_clock::now());
+			auto local_time = *localtime(&now_time_t);
+#endif
+			auto log_file = fmt::format("logs/gt_{:%Y%m%d_%H%M%S}.log", local_time);
 
 			auto file_sink = make_shared<spd::sinks::basic_file_sink_mt>(log_file);
 

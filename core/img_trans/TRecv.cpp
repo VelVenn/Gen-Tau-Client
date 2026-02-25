@@ -2,7 +2,6 @@
 
 #include "utils/TLog.hpp"
 
-#include <unistd.h>
 #include <cerrno>
 
 #include <array>
@@ -184,7 +183,7 @@ i32 TRecv::bindV4(u16 port, const char* ip)
 
 	newAddr.sin_family      = AF_INET;
 	newAddr.sin_addr.s_addr = v4Addr->ip;
-	newAddr.sin_port        = ::htons(v4Addr->port);
+	newAddr.sin_port        = htons(v4Addr->port);
 
 	if (::bind(newSockFd, reinterpret_cast<sockaddr*>(&newAddr), sizeof(newAddr)) < 0) {
 		tImgTransLogError(
