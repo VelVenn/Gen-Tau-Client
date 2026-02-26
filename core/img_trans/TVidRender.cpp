@@ -9,6 +9,7 @@
 #include <gst/app/app.h>
 #include <gst/gst.h>
 
+#include <gst/gstformat.h>
 #include <exception>
 #include <future>
 #include <mutex>
@@ -21,6 +22,7 @@
 
 #define T_LOG_TAG_IMG       "[Video Render] "
 #define RENDER_WAIT_FOREVER (0 && GEN_TAU_DEBUG)
+#define ENABLE_PTS 0
 
 using namespace std;
 using namespace std::string_view_literals;
@@ -368,10 +370,17 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* filePath)
 			-1,                     // Send at best effort
 			"max-bytes",            // No effect when emit-signals is FALSE
 			(guint64)(256 * 1024),  // VT03 Module -> 1080p 60FPS max
+#if ENABLE_PTS && (ENABLE_PTS == 1)
 			"do-timestamp",
 			TRUE,
 			"format",
 			GST_FORMAT_TIME,
+#else
+			"do-timestamp",
+			FALSE,
+			"format",
+			GST_FORMAT_BYTES,
+#endif
 			"stream-type",
 			GST_APP_STREAM_TYPE_STREAM,
 			"emit-signals",
@@ -384,6 +393,9 @@ bool TVidRender::initPipeElements(bool useFileSrc, const char* filePath)
 		// 根据Gstreamer文档的建议，打timestamp和live-source通常要设置'format'为'GST_FORMAT_TIME'，
 		// 但是考虑到发送端可能是透传，设置为'GST_FORMAT_BYTES'可能更合适。这个目前来看影响不大，如果后续
 		// 发现问题再调整。
+
+		// 27/02/26 Note: 开启 PTS, 即 'do-timestamp' 为 TRUE, 会导致 MacOS 下的 VideoTookit 解码
+		// 出现严重回闪。考虑到我们的 sink 根本不关心时钟同步，因此现在暂时不开启 PTS。
 
 		// Using the appsrc
 		// Ref: https://gstreamer.freedesktop.org/documentation/application-development/advanced/pipeline-manipulation.html?gi-language=c#inserting-data-with-appsrc
