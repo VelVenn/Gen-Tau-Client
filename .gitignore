@@ -89,6 +89,8 @@ CMakeLists.txt.user*
 *.env
 
 # Temporary files
+tmp/
+temp/
 *tmp*.cpp
 *tmp*.h
 *tmp*.hpp
@@ -96,6 +98,8 @@ CMakeLists.txt.user*
 
 *logs/
 *.log
+
+misc/
 
 Testing/
 
