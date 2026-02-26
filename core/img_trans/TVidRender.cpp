@@ -9,7 +9,6 @@
 #include <gst/app/app.h>
 #include <gst/gst.h>
 
-#include <gst/gstformat.h>
 #include <exception>
 #include <future>
 #include <mutex>
