@@ -4,3 +4,10 @@ gt_register_test(
   DEPS
     utils
 )
+
+gt_register_test(
+  NAME scheduler-test
+  SRC scheduler-test.cpp
+  DEPS
+    utils
+)
