@@ -27,7 +27,7 @@ void TRecv::stop()
 
 void TRecv::stopAsync()
 {
-	if (recvThread.joinable()) { recvThread.request_stop(); }
+	recvThread.request_stop();
 }
 
 int TRecv::start()
