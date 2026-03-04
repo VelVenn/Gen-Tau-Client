@@ -99,16 +99,39 @@ class TScheduler
 	std::jthread eventLoop;
 
   public:
+	/**
+	 * @brief 添加一个周期性任务到调度器中
+	 * @param inv 任务执行的周期
+	 * @param callable 任务执行的方法
+	 * @param args 任务执行的参数
+	 * @return 任务的句柄
+	 * @note 多线程安全，但是调用者需要自行保证传入的参数的生命周期长于任务的生命周期
+	 */
 	template<typename Rep, typename Period, typename Callable, typename... Args>
 		requires std::invocable<Callable, Args...>
 	std::optional<TaskHandle> addTask(
 		std::chrono::duration<Rep, Period> inv, Callable&& callable, Args&&... args
 	);
 
+	/**
+	 * @brief 从调度器中移除一个任务
+	 * @param hndl 任务的句柄
+	 * @note 多线程安全
+	 */
 	bool removeTask(TaskHandle hndl);
 
+	/**
+	 * @brief 启动调度器
+	 * @note 非多线程安全！强烈建议仅在创建了当前 TScheduler 实例的线程中调用此方法。该方法
+	 *       可以多次调用，如果检查到调度器已经启动，该方法会立即返回。
+	 */
 	void run();
 
+	/**
+	 * @brief 停止调度器，该方法会阻塞直到调度器完全停止
+	 * @note 非多线程安全！强烈建议仅在创建了当前 TScheduler 实例的线程中调用此方法。一般情
+	 *       况下，你不需要手动调用此方法。
+	 */
 	void stop()
 	{
 		if (eventLoop.joinable()) {
@@ -117,6 +140,11 @@ class TScheduler
 		}
 	}
 
+	/**
+	 * @brief 异步地停止调度器，该方法会立即返回
+	 * @note 非多线程安全！强烈建议仅在创建了当前 TScheduler 实例的线程中调用此方法。一般情
+	 *       况下，你不需要手动调用此方法。
+	 */
 	void stopAsync() { eventLoop.request_stop(); }
 
   public:
@@ -133,7 +161,7 @@ template<typename Rep, typename Period, typename Callable, typename... Args>
 	requires std::invocable<Callable, Args...>
 auto TScheduler::addTask(
 	std::chrono::duration<Rep, Period> inv, Callable&& callable, Args&&... args
-) -> std::optional<TaskHandle> // Template function must be defined in headers.
+) -> std::optional<TaskHandle>
 {
 	TaskHandle      hndl = globHndlCount.fetch_add(1);
 	Task::SharedPtr task = Task::create(
@@ -145,6 +173,9 @@ auto TScheduler::addTask(
 	);
 
 	// Pack lambda capture: https://en.cppreference.com/w/cpp/language/lambda.html#Lambda_capture
+
+	// Template function must be defined in headers. It won't volatile ODR unless
+	// it is fully specialized.
 
 	{
 		std::scoped_lock lock(mtx);
