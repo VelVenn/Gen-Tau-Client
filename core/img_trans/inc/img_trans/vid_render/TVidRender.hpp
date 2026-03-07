@@ -116,10 +116,26 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	GstElement* fixedSink;  // Should not changed the pointer after init
 
   public:
-	TSignal<TVidRender>                                                   onEOS;
-	TSignal<TVidRender, IssueType, std::string, std::string, std::string> onPipeError;
-	TSignal<TVidRender, IssueType, std::string, std::string, std::string> onPipeWarn;
-	TSignal<TVidRender, StateType, StateType>                             onStateChanged;
+	TSignal<TVidRender> onEOS;  // End of stream detected
+
+	TSignal<
+		TVidRender,
+		IssueType,
+		std::string /*Err src*/,
+		std::string /*Err msg*/,
+		std::string /*Debug info*/>
+		onPipeError;  // `gentau::TVidRender::IssueType`, `std::string` (src), `std::string` (msg), `std::string` (debug info)
+
+	TSignal<
+		TVidRender,
+		IssueType,
+		std::string /*Warn src*/,
+		std::string /*Warn msg*/,
+		std::string /*Debug info*/>
+		onPipeWarn;  // `gentau::TVidRender::IssueType`, `std::string` (src), `std::string` (msg), `std::string` (debug info)
+
+	TSignal<TVidRender, StateType /*Old state*/, StateType /*New state*/>
+		onStateChanged;  // `gentau::TVidRender::StateType` (old state), `gentau::TVidRender::StateType` (new state)
 
   private:
 	std::atomic<TimePoint> lastPushSuccess = TimePoint::min();
@@ -249,8 +265,12 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	void postTestError();
 
   public:
-	explicit TVidRender(u64 _maxBufferBytes = 262'144, bool _enableTestMode = false);  // Default to 256 KB
-	explicit TVidRender(const char* file_path, u64 _maxBufferBytes = 262'144, bool _enableTestMode = false);
+	explicit TVidRender(
+		u64 _maxBufferBytes = 262'144, bool _enableTestMode = false
+	);  // Default to 256 KB
+	explicit TVidRender(
+		const char* file_path, u64 _maxBufferBytes = 262'144, bool _enableTestMode = false
+	);
 
 	/** 
 	 * @brief: create a shared pointer to TVidRender instance. 
