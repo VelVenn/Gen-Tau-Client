@@ -12,7 +12,7 @@ namespace gentau {
 using LoggerPtr = std::shared_ptr<spdlog::async_logger>;
 
 LoggerPtr getImgTransLogger();
-LoggerPtr getProtoLogger();
+LoggerPtr getCommLogger();
 LoggerPtr getGeneralLogger();
 
 }  // namespace gentau
@@ -35,19 +35,19 @@ LoggerPtr getGeneralLogger();
 		gentau::getImgTransLogger(), T_LOG_TAG_IMG fmt __VA_OPT__(, ) __VA_ARGS__                  \
 	)
 
-// Protobuf Module Logging Macros
-#define tProtoLogTrace(fmt, ...)                                                                   \
-	SPDLOG_LOGGER_TRACE(gentau::getProtoLogger(), T_LOG_TAG_PROTO fmt __VA_OPT__(, ) __VA_ARGS__)
-#define tProtoLogDebug(fmt, ...)                                                                   \
-	SPDLOG_LOGGER_DEBUG(gentau::getProtoLogger(), T_LOG_TAG_PROTO fmt __VA_OPT__(, ) __VA_ARGS__)
-#define tProtoLogInfo(fmt, ...)                                                                    \
-	SPDLOG_LOGGER_INFO(gentau::getProtoLogger(), T_LOG_TAG_PROTO fmt __VA_OPT__(, ) __VA_ARGS__)
-#define tProtoLogWarn(fmt, ...)                                                                    \
-	SPDLOG_LOGGER_WARN(gentau::getProtoLogger(), T_LOG_TAG_PROTO fmt __VA_OPT__(, ) __VA_ARGS__)
-#define tProtoLogError(fmt, ...)                                                                   \
-	SPDLOG_LOGGER_ERROR(gentau::getProtoLogger(), T_LOG_TAG_PROTO fmt __VA_OPT__(, ) __VA_ARGS__)
-#define tProtoLogCritical(fmt, ...)                                                                \
-	SPDLOG_LOGGER_CRITICAL(gentau::getProtoLogger(), T_LOG_TAG_PROTO fmt __VA_OPT__(, ) __VA_ARGS__)
+// Communication Module Logging Macros
+#define tCommLogTrace(fmt, ...)                                                                    \
+	SPDLOG_LOGGER_TRACE(gentau::getCommLogger(), T_LOG_TAG_COMM fmt __VA_OPT__(, ) __VA_ARGS__)
+#define tCommLogDebug(fmt, ...)                                                                    \
+	SPDLOG_LOGGER_DEBUG(gentau::getCommLogger(), T_LOG_TAG_COMM fmt __VA_OPT__(, ) __VA_ARGS__)
+#define tCommLogInfo(fmt, ...)                                                                     \
+	SPDLOG_LOGGER_INFO(gentau::getCommLogger(), T_LOG_TAG_COMM fmt __VA_OPT__(, ) __VA_ARGS__)
+#define tCommLogWarn(fmt, ...)                                                                     \
+	SPDLOG_LOGGER_WARN(gentau::getCommLogger(), T_LOG_TAG_COMM fmt __VA_OPT__(, ) __VA_ARGS__)
+#define tCommLogError(fmt, ...)                                                                    \
+	SPDLOG_LOGGER_ERROR(gentau::getCommLogger(), T_LOG_TAG_COMM fmt __VA_OPT__(, ) __VA_ARGS__)
+#define tCommLogCritical(fmt, ...)                                                                 \
+	SPDLOG_LOGGER_CRITICAL(gentau::getCommLogger(), T_LOG_TAG_COMM fmt __VA_OPT__(, ) __VA_ARGS__)
 
 // General Logging Macros
 #define tLogTrace(fmt, ...)                                                                        \
@@ -71,12 +71,12 @@ LoggerPtr getGeneralLogger();
 #define tImgTransLogError(fmt, ...)    ((void)0)
 #define tImgTransLogCritical(fmt, ...) ((void)0)
 
-#define tProtoLogTrace(fmt, ...)    ((void)0)
-#define tProtoLogDebug(fmt, ...)    ((void)0)
-#define tProtoLogInfo(fmt, ...)     ((void)0)
-#define tProtoLogWarn(fmt, ...)     ((void)0)
-#define tProtoLogError(fmt, ...)    ((void)0)
-#define tProtoLogCritical(fmt, ...) ((void)0)
+#define tCommLogTrace(fmt, ...)    ((void)0)
+#define tCommLogDebug(fmt, ...)    ((void)0)
+#define tCommLogInfo(fmt, ...)     ((void)0)
+#define tCommLogWarn(fmt, ...)     ((void)0)
+#define tCommLogError(fmt, ...)    ((void)0)
+#define tCommLogCritical(fmt, ...) ((void)0)
 
 #define tLogTrace(fmt, ...)    ((void)0)
 #define tLogDebug(fmt, ...)    ((void)0)

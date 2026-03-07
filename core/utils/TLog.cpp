@@ -79,9 +79,9 @@ LoggerPtr getImgTransLogger()
 	return logger;
 }
 
-LoggerPtr getProtoLogger()
+LoggerPtr getCommLogger()
 {
-	static LoggerPtr logger = createAsyncLogger("Proto");
+	static LoggerPtr logger = createAsyncLogger("Comm");
 	return logger;
 }
 
