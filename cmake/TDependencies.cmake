@@ -8,9 +8,9 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS
 )
 find_package(PkgConfig REQUIRED)
 
-pkg_check_modules(GST REQUIRED IMPORTED_TARGET gstreamer-1.0)
-pkg_check_modules(GST_VID REQUIRED IMPORTED_TARGET gstreamer-video-1.0)
-pkg_check_modules(GST_APP REQUIRED IMPORTED_TARGET gstreamer-app-1.0)
+pkg_check_modules(GST REQUIRED IMPORTED_TARGET gstreamer-1.0>=1.26)
+pkg_check_modules(GST_VID REQUIRED IMPORTED_TARGET gstreamer-video-1.0>=1.26)
+pkg_check_modules(GST_APP REQUIRED IMPORTED_TARGET gstreamer-app-1.0>=1.26)
 
 include(FetchContent)
 
@@ -42,6 +42,16 @@ FetchContent_Declare(
   GIT_TAG v1.17.0
 )
 FetchContent_MakeAvailable(spdlog)
+
+FetchContent_Declare(
+  paho-mqtt-cpp
+  GIT_REPOSITORY https://github.com/eclipse-paho/paho.mqtt.cpp.git
+  GIT_TAG v1.6.0
+)
+set(PAHO_BUILD_STATIC ON CACHE BOOL "Build static library" FORCE)
+set(PAHO_WITH_MQTT_C ON CACHE BOOL "Build with the bundled C library" FORCE)
+set(PAHO_WITH_SSL OFF CACHE BOOL "Build with SSL support" FORCE)
+FetchContent_MakeAvailable(paho-mqtt-cpp)
 
 FetchContent_Declare(
   googletest
