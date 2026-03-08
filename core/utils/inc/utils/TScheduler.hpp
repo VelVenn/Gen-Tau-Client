@@ -67,7 +67,7 @@ class TScheduler
 		std::function<void()> job;
 		TimePoint             startTime;
 		NanoSec               interval  = NanoSec(Sec(1));
-		u64                   execCount = 0;
+		i64                   execCount = 0;
 		std::atomic<bool>     cancelled{ false };
 
 		void doJob()
@@ -79,6 +79,15 @@ class TScheduler
 			if (job) { job(); }
 
 			execCount++;
+
+			// 将 execCount 声明为 u64 会导致计算 timeGap 时发生溢出，因为 std::chrono::steady_clock::time_point
+			// 底层是 i64，这会导致计算出的 duration 的 Rep 被隐式转换为 u64
+			TimePoint now       = std::chrono::steady_clock::now(); 
+			TimePoint nextIdeal = startTime + execCount * interval;
+
+			auto timeGap = now - nextIdeal;
+
+			if (timeGap > interval) { execCount += timeGap / interval; }  // Preventing task bursts
 
 			tid.nextRun = startTime + execCount * interval;
 		}
