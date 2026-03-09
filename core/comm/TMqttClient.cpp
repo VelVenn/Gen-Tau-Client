@@ -108,14 +108,18 @@ TMqttClient::TMqttClient(const string& _clientId, const string& _serverURI) :
 
 	connOpt = make_unique<connect_options>(connect_options_builder()
 											   .clean_session()
-											   .automatic_reconnect(1s, 10s)
+											   .automatic_reconnect(1s, 5s)
 											   .connect_timeout(5s)
 											   .keep_alive_interval(5s)
 											   .max_inflight(25)
 											   .finalize());
 }
 
-TMqttClient::~TMqttClient() = default;
+TMqttClient::~TMqttClient()
+{
+	tCommLogDebug("Shutting down client...");
+	disconnect();
+};
 
 void TMqttClient::subscribeAll()
 {

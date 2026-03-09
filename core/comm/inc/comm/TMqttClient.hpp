@@ -15,10 +15,12 @@ class connect_options;
 }  // namespace mqtt
 
 namespace gentau {
-class TMqttClient
+class TMqttClient : std::enable_shared_from_this<TMqttClient>
 {
   public:
-	using SharedPtr        = std::shared_ptr<TMqttClient>;
+	using SharedPtr = std::shared_ptr<TMqttClient>;
+	using WeakRef   = std::weak_ptr<TMqttClient>;
+
 	using ReceiveHandler   = std::function<void(const std::string& /*Payload*/)>;
 	using HandlerSignal    = TSignal<TMqttClient, const std::string&>;
 	using HandlerSignalPtr = std::shared_ptr<HandlerSignal>;
@@ -78,6 +80,8 @@ class TMqttClient
 	{
 		return std::make_shared<TMqttClient>(_clientId, _serverURI);
 	}
+
+	static WeakRef weakRef(SharedPtr ptr) { return WeakRef(ptr); }
 
 	~TMqttClient();
 
