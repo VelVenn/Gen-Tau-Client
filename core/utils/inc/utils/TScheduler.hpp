@@ -36,6 +36,7 @@ namespace gentau {
 class TScheduler
 {
   public:
+	using SharedPtr = std::shared_ptr<TScheduler>;
 	using TimePoint  = std::chrono::steady_clock::time_point;
 	using NanoSec    = std::chrono::nanoseconds;
 	using Sec        = std::chrono::seconds;
@@ -82,12 +83,14 @@ class TScheduler
 
 			// 将 execCount 声明为 u64 会导致计算 timeGap 时发生溢出，因为 std::chrono::steady_clock::time_point
 			// 底层是 i64，这会导致计算出的 duration 的 Rep 被隐式转换为 u64
-			TimePoint now       = std::chrono::steady_clock::now(); 
+			TimePoint now       = std::chrono::steady_clock::now();
 			TimePoint nextIdeal = startTime + execCount * interval;
 
 			auto timeGap = now - nextIdeal;
 
-			if (timeGap > interval) { execCount += timeGap / interval + 1; }  // Preventing task bursts
+			if (timeGap > interval) {
+				execCount += timeGap / interval + 1;
+			}  // Preventing task bursts
 
 			tid.nextRun = startTime + execCount * interval;
 		}
@@ -175,6 +178,8 @@ class TScheduler
   public:
 	TScheduler()  = default;
 	~TScheduler() = default;
+
+	static SharedPtr create() { return std::make_shared<TScheduler>(); }
 
 	TScheduler(const TScheduler&)            = delete;
 	TScheduler& operator=(const TScheduler&) = delete;
