@@ -18,9 +18,11 @@ namespace gentau {
 class TMqttClient
 {
   public:
-	using SharedPtr      = std::shared_ptr<TMqttClient>;
-	using ReceiveHandler = std::function<void(const std::string& /*Payload*/)>;
-	using TopicRegister  = std::unordered_map<std::string, ReceiveHandler>;
+	using SharedPtr        = std::shared_ptr<TMqttClient>;
+	using ReceiveHandler   = std::function<void(const std::string& /*Payload*/)>;
+	using HandlerSignal    = TSignal<TMqttClient, const std::string&>;
+	using HandlerSignalPtr = std::shared_ptr<HandlerSignal>;
+	using TopicRegister    = std::unordered_map<std::string, HandlerSignalPtr>;
 
   public:
 	enum class QoS : i32
@@ -57,7 +59,7 @@ class TMqttClient
 	void publish(
 		const std::string& topic, const std::string& payload, QoS qos = QoS::AT_LEAST_ONCE
 	);
-	void subscribe(const std::string& topic, ReceiveHandler handler);
+	Connection subscribe(const std::string& topic, ReceiveHandler handler);
 
 	void connect();
 	void disconnect();

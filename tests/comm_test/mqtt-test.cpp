@@ -37,8 +37,6 @@ int main()
         isRunning.store(false);
     };
 
-	client->connect();
-
 	client->subscribe("Testing", [](const string& payload) {
 		std::cout << "\n=============================================" << std::endl;
 
@@ -58,7 +56,9 @@ int main()
 		std::cout << "=============================================\n" << std::endl;
 	});
 
-    while (isRunning.load()) {
+	client->connect();
+
+	while (isRunning.load()) {
         this_thread::sleep_for(1s);
     }
 

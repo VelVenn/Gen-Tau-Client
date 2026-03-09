@@ -5,6 +5,7 @@
 #include "utils/TLogical.hpp"
 
 #include "mqtt/async_client.h"
+#include "utils/TSignal.hpp"
 
 #include <memory>
 #include <mutex>
@@ -54,7 +55,7 @@ class TMqttClient::Callback : public virtual mqtt::callback, public virtual mqtt
 	{
 		if (msg->is_duplicate()) { return; }
 
-		ReceiveHandler handler;
+		HandlerSignalPtr sigPtr;
 		{
 			shared_lock lock(client->topicRegMtx);
 			auto        iter = client->topicRegister.find(msg->get_topic());
@@ -64,10 +65,10 @@ class TMqttClient::Callback : public virtual mqtt::callback, public virtual mqtt
 				return;
 			}
 
-			handler = iter->second;
+			sigPtr = iter->second;
 		}
 
-		handler(msg->get_payload());
+		sigPtr->emit(msg->get_payload());
 	}
 
 	void delivery_complete(delivery_token_ptr token) override {}
@@ -130,20 +131,24 @@ void TMqttClient::publish(const std::string& topic, const std::string& payload, 
 	cli->publish(topic, payload, static_cast<i32>(qos), false);
 }
 
-void TMqttClient::subscribe(const std::string& topic, ReceiveHandler handler)
+Connection TMqttClient::subscribe(const std::string& topic, ReceiveHandler handler)
 {
+	Connection conn;
+	bool       isNewTopic = false;
 	{
 		unique_lock lock(topicRegMtx);
-		auto [iter, inserted] = topicRegister.try_emplace(topic, handler);
+		auto [iter, inserted] = topicRegister.try_emplace(topic, make_shared<HandlerSignal>());
 
-		if (!inserted) {
-			tCommLogWarn("Topic already subscribed: {}, ignoring this", topic);
+		isNewTopic = inserted;
 
-			return;
-		}
+		conn = iter->second->connect(std::move(handler));
 	}
 
-	if (cli->is_connected()) { cli->subscribe(topic, static_cast<i32>(QoS::AT_LEAST_ONCE)); }
+	if (isNewTopic && cli->is_connected()) {
+		cli->subscribe(topic, static_cast<i32>(QoS::AT_LEAST_ONCE));
+	}
+
+	return conn;
 }
 
 void TMqttClient::connect()
