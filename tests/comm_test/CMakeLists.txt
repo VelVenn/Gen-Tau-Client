@@ -3,7 +3,7 @@ find_package(Protobuf REQUIRED)
 protobuf_generate(
   OUT_VAR PROTO_SRCS
   LANGUAGE cpp
-  PROTOS ${CMAKE_CURRENT_SOURCE_DIR}/test.proto
+  PROTOS ${CMAKE_CURRENT_SOURCE_DIR}/proto/test.proto
 )
 
 gt_register_test(
@@ -11,10 +11,10 @@ gt_register_test(
   SRC
     mqtt-test.cpp
     ${PROTO_SRCS}
+  INC
+    ${CMAKE_CURRENT_BINARY_DIR}
   DEPS
     comm 
     utils
     protobuf::libprotobuf
 )
-
-target_include_directories(mqtt-test PRIVATE ${CMAKE_CURRENT_BINARY_DIR})

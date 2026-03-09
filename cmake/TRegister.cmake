@@ -199,10 +199,9 @@ endfunction()
 # Test registration function
 # ============================================================================
 function(gt_register_test)
-  set(options USE_QT USE_CTEST USE_GTEST NO_GMAIN WITH_HEADER)
+  set(options USE_QT USE_CTEST USE_GTEST NO_GMAIN)
   set(oneValueArgs NAME QML_URI)
-  set(multiValueArgs SRC QML_FILES DEPS GTEST_ARGS)
-
+  set(multiValueArgs SRC INC QML_FILES DEPS GTEST_ARGS)
   cmake_parse_arguments(PARSE_ARGV 0 GT_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}")
 
   if(NOT GT_TEST_NAME)
@@ -259,15 +258,9 @@ function(gt_register_test)
   # ===============
 
   # 设置头文件目录
-  if(GT_TEST_WITH_HEADER)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/inc")
-      target_include_directories(${GT_TEST_NAME} PRIVATE 
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
-      )
-      message(STATUS "gt_register_test -> ${GT_TEST_NAME}: Header directory specified as '${CMAKE_CURRENT_SOURCE_DIR}/inc'")
-    else()
-      message(WARNING "! gt_register_test -> ${GT_TEST_NAME}: WITH_HEADER specified but '${CMAKE_CURRENT_SOURCE_DIR}/inc' directory not found, ignored !")
-    endif()
+  if(GT_TEST_INC)
+    target_include_directories(${GT_TEST_NAME} PRIVATE ${GT_TEST_INC})
+    message(STATUS "gt_register_test -> ${GT_TEST_NAME}: Header directories specified as '${GT_TEST_INC}'")
   endif()
   # ===============
 

@@ -2,7 +2,7 @@
 #include "utils/TLog.hpp"
 #include "utils/TScheduler.hpp"
 
-#include "test.pb.h"
+#include "proto/test.pb.h"
 
 #include <atomic>
 #include <csignal>
