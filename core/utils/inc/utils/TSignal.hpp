@@ -17,6 +17,17 @@ struct IsSigslotSignal<sigslot::signal<Args...>> : std::true_type
 template<typename T>
 concept SigslotSignalType = IsSigslotSignal<T>::value;
 
+template<typename SigType, typename... Args>
+concept Connectable =
+	requires(SigType& sig, Args&&... args) { sig.connect(std::forward<Args>(args)...); };
+
+template<typename SigType, typename... Args>
+concept Disconnectable =
+	requires(SigType& sig, Args&&... args) { sig.disconnect(std::forward<Args>(args)...); };
+
+using Connection       = sigslot::connection;
+using ScopedConnection = sigslot::scoped_connection;
+
 /**
  * TSignal 是对 sigslot::signal 的一个简单封装，它限制了信号只能由指定的 OwnerType 发出，
  * 并且提供了更简洁的接口来连接和断开槽函数。
@@ -60,12 +71,19 @@ class TSignal
 	 * in the context of the emitter. Callers are responsible for dispatching
 	 * to the appropriate thread if needed.
 	 */
-	auto connect(auto&&... args) { return sig.connect(std::forward<decltype(args)>(args)...); }
+	template<typename ...ConnArgs>
+		requires Connectable<sigslot::signal<Args...>, ConnArgs...>
+	Connection connect(ConnArgs&&... args)
+	{
+		return sig.connect(std::forward<ConnArgs>(args)...);
+	}
 
 	// Disconnect from the signal
-	auto disconnect(auto&&... args)
+	template<typename ...DisconnArgs>
+		requires Disconnectable<sigslot::signal<Args...>, DisconnArgs...>
+	size_t disconnect(DisconnArgs&&... args)
 	{
-		return sig.disconnect(std::forward<decltype(args)>(args)...);
+		return sig.disconnect(std::forward<DisconnArgs>(args)...);
 	}
 
 	/**
@@ -74,10 +92,14 @@ class TSignal
 	 * in the context of the emitter. Callers are responsible for dispatching
 	 * to the appropriate thread if needed.
 	 */
-	auto operator+=(auto&& slot) { return sig.connect(std::forward<decltype(slot)>(slot)); }
+	template<typename SlotType>
+		requires Connectable<sigslot::signal<Args...>, SlotType>
+	Connection operator+=(SlotType&& slot) { return sig.connect(std::forward<SlotType>(slot)); }
 
 	// Disconnect from the signal, if you want to pass multiple args, use disconnect() instead
-	auto operator-=(auto&& slot) { return sig.disconnect(std::forward<decltype(slot)>(slot)); }
+	template<typename SlotType>
+		requires Disconnectable<sigslot::signal<Args...>, SlotType>
+	size_t operator-=(SlotType&& slot) { return sig.disconnect(std::forward<SlotType>(slot)); }
 
 	TSignal() = default;
 	~TSignal() { sig.disconnect_all(); }
