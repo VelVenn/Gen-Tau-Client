@@ -1,6 +1,5 @@
 #include "comm/TMqttClient.hpp"
 #include "utils/TLog.hpp"
-#include "utils/TScheduler.hpp"
 
 #include "proto/test.pb.h"
 
@@ -11,7 +10,7 @@
 #include <string>
 #include <thread>
 
-#define T_LOG_TAG "[MQTT Test] "
+#define T_LOG_TAG "[MQTT Test Sub] "
 
 using namespace gentau;
 using namespace std;
@@ -29,15 +28,13 @@ int main()
 	std::signal(SIGINT, onSignal);
 	std::signal(SIGTERM, onSignal);
 
-	auto client = TMqttClient::create("101");
+	auto client = TMqttClient::create("gen-tau-test-sub");
 
-    client->onConnectionFailed += [](const string& cause) {
-        tLogCritical("Failed to connect the broker: {}", cause);
+	client->onConnectionFailed += [](const string& cause) {
+		tLogCritical("Failed to connect the broker: {}", cause);
+	};
 
-        isRunning.store(false);
-    };
-
-	client->subscribe("Testing", [](const string& payload) {
+	client->registerTopic("Testing", [](const string& payload) {
 		std::cout << "\n=============================================" << std::endl;
 
 		// 反序列化过程
@@ -58,9 +55,7 @@ int main()
 
 	client->connect();
 
-	while (isRunning.load()) {
-        this_thread::sleep_for(1s);
-    }
+	while (isRunning.load()) { this_thread::sleep_for(1s); }
 
 	return 0;
 }

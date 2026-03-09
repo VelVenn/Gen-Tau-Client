@@ -7,9 +7,22 @@ protobuf_generate(
 )
 
 gt_register_test(
-  NAME mqtt-test
+  NAME mqtt-test-sub
   SRC
-    mqtt-test.cpp
+    mqtt-test-sub.cpp
+    ${PROTO_SRCS}
+  INC
+    ${CMAKE_CURRENT_BINARY_DIR}
+  DEPS
+    comm 
+    utils
+    protobuf::libprotobuf
+)
+
+gt_register_test(
+  NAME mqtt-test-pub
+  SRC
+    mqtt-test-pub.cpp
     ${PROTO_SRCS}
   INC
     ${CMAKE_CURRENT_BINARY_DIR}

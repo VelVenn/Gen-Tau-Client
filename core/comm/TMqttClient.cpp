@@ -118,16 +118,28 @@ TMqttClient::TMqttClient(const string& _clientId, const string& _serverURI) :
 TMqttClient::~TMqttClient()
 {
 	tCommLogDebug("Shutting down client...");
-	disconnect();
 };
 
 void TMqttClient::subscribeAll()
 {
-	shared_lock lock(topicRegMtx);
+	unordered_set<string> failedTopics;
+	{
+		shared_lock lock(topicRegMtx);
+		failedTopics.reserve(topicRegister.size());
 
-	for (auto& topicReg : topicRegister) {
-		cli->subscribe(topicReg.first, static_cast<i32>(QoS::AT_LEAST_ONCE));
+		for (auto& topicReg : topicRegister) {
+			try {
+				cli->subscribe(topicReg.first, static_cast<i32>(QoS::AT_LEAST_ONCE));
+			} catch (const mqtt::exception& exc) {
+				tCommLogError(
+					"Failed to subscribe to topic '{}', cause: {}", topicReg.first, exc.what()
+				);
+				failedTopics.emplace(topicReg.first);
+			}
+		}
 	}
+
+	if (!failedTopics.empty()) { onSubSyncFailed(failedTopics); }
 }
 
 void TMqttClient::publish(const std::string& topic, const std::string& payload, QoS qos)
@@ -135,7 +147,7 @@ void TMqttClient::publish(const std::string& topic, const std::string& payload, 
 	cli->publish(topic, payload, static_cast<i32>(qos), false);
 }
 
-Connection TMqttClient::subscribe(const std::string& topic, ReceiveHandler handler)
+Connection TMqttClient::registerTopic(const std::string& topic, ReceiveHandler handler)
 {
 	Connection conn;
 	bool       isNewTopic = false;
@@ -148,8 +160,21 @@ Connection TMqttClient::subscribe(const std::string& topic, ReceiveHandler handl
 		conn = iter->second->connect(std::move(handler));
 	}
 
-	if (isNewTopic && cli->is_connected()) {
-		cli->subscribe(topic, static_cast<i32>(QoS::AT_LEAST_ONCE));
+	if (isNewTopic) {
+		try {
+			cli->subscribe(topic, static_cast<i32>(QoS::AT_LEAST_ONCE));
+		} catch (const mqtt::exception& exc) {
+			tCommLogDebug(
+				"Attempt to subscribe to topic '{}' after register but failed, "
+				"this is usually not serious problem, cause: {}",
+				topic,
+				exc.what()
+			);
+			// Do nothing, usually means the client is not connected.
+			// If we check cli->is_connected() then sub may cause check-then-act problem,
+			// so we just try-catch and ignore the failure, the subscribe will be retried in
+			// the next connection attempt.
+		}
 	}
 
 	return conn;
@@ -161,57 +186,6 @@ void TMqttClient::connect()
 		tCommLogWarn("Already connected, ignoring this");
 		return;
 	}
-
-	cli->connect(*connOpt, nullptr, *cb);
-}
-
-void TMqttClient::disconnect()
-{
-	tCommLogInfo("Trying to disconnect client...");
-
-	try {
-		// A value of zero or less means the client will not quiesce.
-		cli->disconnect(0)->wait();
-		tCommLogInfo("Client disconnected successfully");
-	} catch (const mqtt::exception& exc) {
-		tCommLogError("Client disconnect failed: {}", exc.what());
-	}
-}
-
-void TMqttClient::rebind(const string& _clientId, const string& _serverURI)
-{
-	if (anyFalse(_clientId, _serverURI)) {
-		throw invalid_argument("Neither client ID nor server URI can be empty");
-	}
-
-	if (this->clientId == _clientId && this->serverURI == _serverURI) { return; }
-
-	tCommLogInfo(
-		"Atempting to rebind client id: {} -> {}, server: {} -> {}",
-		clientId,
-		_clientId,
-		serverURI,
-		_serverURI
-	);
-
-	disconnect();
-
-	clientId  = _clientId;
-	serverURI = _serverURI;
-
-	auto createOpt = create_options_builder()
-						 .client_id(clientId)
-						 .server_uri(serverURI)
-						 .mqtt_version(MQTTVERSION_DEFAULT)
-						 .persistence(NO_PERSISTENCE)
-						 .persist_qos0(false)
-						 .restore_messages(false)
-						 .send_while_disconnected(false)
-						 .delete_oldest_messages()
-						 .finalize();
-
-	cli = make_unique<async_client>(createOpt);
-	cli->set_callback(*cb);
 
 	cli->connect(*connOpt, nullptr, *cb);
 }

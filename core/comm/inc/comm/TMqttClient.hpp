@@ -8,6 +8,7 @@
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace mqtt {
 class async_client;
@@ -54,6 +55,9 @@ class TMqttClient : std::enable_shared_from_this<TMqttClient>
 	TSignal<TMqttClient, std::string /*Cause*/> onConnectionLost;    // `std::string` (cause)
 	TSignal<TMqttClient, std::string /*Cause*/> onConnectionFailed;  // `std::string` (cause)
 
+	TSignal<TMqttClient, const std::unordered_set<std::string>& /*Failed Topics*/>
+		onSubSyncFailed;  // `const std::unordered_set<std::string>&` (failed topics)
+
   private:
 	void subscribeAll();
 
@@ -61,13 +65,9 @@ class TMqttClient : std::enable_shared_from_this<TMqttClient>
 	void publish(
 		const std::string& topic, const std::string& payload, QoS qos = QoS::AT_LEAST_ONCE
 	);
-	Connection subscribe(const std::string& topic, ReceiveHandler handler);
+	Connection registerTopic(const std::string& topic, ReceiveHandler handler);
 
 	void connect();
-	void disconnect();
-	void rebind(
-		const std::string& _clientId, const std::string& _serverURI = "mqtt://localhost:3333"
-	);
 
   public:
 	explicit TMqttClient(
