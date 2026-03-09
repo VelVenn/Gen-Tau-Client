@@ -6,8 +6,8 @@ gt_register_mod(
   SRC ${SRC_FILES}
   DEPS
     utils
-    PahoMqttCpp::paho-mqttpp3-static
 
     PRIVATE
       conf
+      PahoMqttCpp::paho-mqttpp3-static
 )
