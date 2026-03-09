@@ -87,7 +87,7 @@ class TScheduler
 
 			auto timeGap = now - nextIdeal;
 
-			if (timeGap > interval) { execCount += timeGap / interval; }  // Preventing task bursts
+			if (timeGap > interval) { execCount += timeGap / interval + 1; }  // Preventing task bursts
 
 			tid.nextRun = startTime + execCount * interval;
 		}
