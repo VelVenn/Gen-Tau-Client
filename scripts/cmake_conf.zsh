@@ -15,6 +15,7 @@ VERBOSE=0
 DO_MEM_PROF=0
 LOG=1
 LOG_FILE=1
+LOG_CONSOLE=1
 LOG_LEVEL="DEFAULT"
 
 while [[ "$#" -gt 0 ]]; do
@@ -30,7 +31,8 @@ while [[ "$#" -gt 0 ]]; do
         -C|--clean-rebuild)    DO_CLEAN=1    ;;
         
         -n|--no-log)           LOG=0         ;;
-        -N|--no-log-file)      LOG_FILE=0    ;;
+        --no-log-file)         LOG_FILE=0    ;;
+        --no-log-cons)         LOG_CONSOLE=0 ;;
         -L|--log-level)        LOG_LEVEL="$2"; shift ;;
         -m|--mem-prof)         DO_MEM_PROF=1 ;;
         
@@ -52,7 +54,8 @@ while [[ "$#" -gt 0 ]]; do
             echo "Build Options:"
             echo "  -m, --mem-prof         Enable memory profiling (default: off)"
             echo "  -n, --no-log           Disable all logging (default: off)"
-            echo "  -N, --no-log-file      Disable log file output (default: off)"
+            echo "  --no-log-file          Disable log file output (default: off)"
+            echo "  --no-log-cons          Disable log console output (default: off)"
             echo "  -L, --log-level LEVEL  Set log level [TRACE|DEBUG|INFO|WARN|ERROR|CRITICAL]"
             echo "General:"
             echo "  -h, --help             Show this help message"
@@ -85,6 +88,7 @@ echo "========================================"
 cmake -S "$SRC_DIR" -G "$GENERATOR" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -B "$BUILD_DIR" \
     -DGEN_TAU_CMAKE_VERBOSE="$VERBOSE" \
     -DGEN_TAU_LOG_ENABLED="$LOG" \
+    -DGEN_TAU_LOG_TO_CONSOLE="$LOG_CONSOLE" \
     -DGEN_TAU_LOG_TO_FILE="$LOG_FILE" \
     -DGEN_TAU_LOG_LEVEL="$LOG_LEVEL" \
     -DGEN_TAU_USE_ASAN="$DO_MEM_PROF" \

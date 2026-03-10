@@ -11,8 +11,13 @@ namespace gentau {
 
 using LoggerPtr = std::shared_ptr<spdlog::async_logger>;
 
+// DO NOT CALL THIS DIRECTLY
 LoggerPtr getImgTransLogger();
+
+// DO NOT CALL THIS DIRECTLY
 LoggerPtr getCommLogger();
+
+// DO NOT CALL THIS DIRECTLY
 LoggerPtr getGeneralLogger();
 
 }  // namespace gentau

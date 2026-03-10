@@ -3,6 +3,8 @@ include_guard(GLOBAL)
 # =========================== GEN_TAU LOGGING OPTIONS ============================
 option(GEN_TAU_LOG_ENABLED "Enable Gen-τ logging" ON)
 
+option(GEN_TAU_LOG_TO_CONSOLE "Enable Gen-τ logging to console" OFF)
+
 option(GEN_TAU_LOG_TO_FILE "Enable Gen-τ logging to file" ON)
 
 set(GEN_TAU_LOG_LEVEL "DEFAULT" CACHE STRING "The minimum log level to compile in")

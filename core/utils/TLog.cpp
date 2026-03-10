@@ -22,9 +22,14 @@ static vector<spd::sink_ptr> createSinks()
 {
 	static vector<spd::sink_ptr> sinks = []() {
 		vector<spd::sink_ptr> s_list;
-		auto                  stdout_sink = make_shared<spd::sinks::stdout_color_sink_mt>();
 
 		spd::init_thread_pool(8192, 1);
+
+		if constexpr (conf::TLogToConsole) {
+			auto stdout_sink = make_shared<spd::sinks::stdout_color_sink_mt>();
+			stdout_sink->set_level(spd::level::debug);
+			s_list.push_back(stdout_sink);
+		}
 
 		if constexpr (conf::TLogToFile) {
 #ifdef __linux__
@@ -43,9 +48,6 @@ static vector<spd::sink_ptr> createSinks()
 			file_sink->set_level(spd::level::trace);
 			s_list.push_back(file_sink);
 		}
-
-		stdout_sink->set_level(spd::level::debug);
-		s_list.push_back(stdout_sink);
 
 		return s_list;
 	}();  // Return value of lambda to static variable immediately.

@@ -9,6 +9,7 @@
 
 #cmakedefine01 GEN_TAU_DEBUG
 #cmakedefine01 GEN_TAU_LOG_ENABLED
+#cmakedefine01 GEN_TAU_LOG_TO_CONSOLE
 #cmakedefine01 GEN_TAU_LOG_TO_FILE
 
 #define GEN_TAU_LOG_LEVEL "@GEN_TAU_LOG_LEVEL@"
@@ -19,6 +20,8 @@ constexpr bool TDebugMode = (GEN_TAU_DEBUG == 1);
 
 // Will only works if SOLELY use the logging macros provided in TLog.hpp
 constexpr bool TLogEnabled = (GEN_TAU_LOG_ENABLED == 1);
+
+constexpr bool TLogToConsole = (GEN_TAU_LOG_TO_CONSOLE == 1);
 
 constexpr bool TLogToFile = (GEN_TAU_LOG_TO_FILE == 1);
 }  
