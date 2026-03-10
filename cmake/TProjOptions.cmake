@@ -26,5 +26,5 @@ option(GEN_TAU_CMAKE_VERBOSE "Enable Gen-τ CMake verbose output" OFF)
 # ========================= GEN_TAU CMAKE DEBUG OPTIONS ==========================
 
 # ========================= GEN_TAU GLOBAL TEST OPTIONS ==========================
-option(GEN_TAU_BUILD_TESTS "Build Gen-τ tests" ON)
+option(GEN_TAU_BUILD_TESTS "Build Gen-τ tests" OFF)
 # ========================= GEN_TAU GLOBAL TEST OPTIONS ==========================

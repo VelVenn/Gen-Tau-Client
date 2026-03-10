@@ -13,6 +13,7 @@ DO_CLEAN=0
 VERBOSE=0
 
 DO_MEM_PROF=0
+DO_TEST=0
 LOG=1
 LOG_FILE=1
 LOG_CONSOLE=1
@@ -34,7 +35,9 @@ while [[ "$#" -gt 0 ]]; do
         --no-log-file)         LOG_FILE=0    ;;
         --no-log-cons)         LOG_CONSOLE=0 ;;
         -L|--log-level)        LOG_LEVEL="$2"; shift ;;
+
         -m|--mem-prof)         DO_MEM_PROF=1 ;;
+        -T|--build-test)       DO_TEST=1     ;;
         
         -h|--help)      
             echo "Usage: $0 [options]"
@@ -52,6 +55,7 @@ while [[ "$#" -gt 0 ]]; do
             echo "  -C, --clean-rebuild    Remove build directory before configure"
             echo ""
             echo "Build Options:"
+            echo "  -T, --build-test       Build tests (default: off)"
             echo "  -m, --mem-prof         Enable memory profiling (default: off)"
             echo "  -n, --no-log           Disable all logging (default: off)"
             echo "  --no-log-file          Disable log file output (default: off)"
@@ -92,6 +96,7 @@ cmake -S "$SRC_DIR" -G "$GENERATOR" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -B "$BUILD_
     -DGEN_TAU_LOG_TO_FILE="$LOG_FILE" \
     -DGEN_TAU_LOG_LEVEL="$LOG_LEVEL" \
     -DGEN_TAU_USE_ASAN="$DO_MEM_PROF" \
+    -DGEN_TAU_BUILD_TESTS="$DO_TEST" \
 
 if [ $? -ne 0 ]; then
     echo "Error: CMake Configuration failed."
