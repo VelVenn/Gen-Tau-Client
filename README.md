@@ -2,7 +2,7 @@
     <img src="assets/Gentau-colored.png" width="200"/>
 </p>
 
-# Gen-Tau Client - RoboMaster 2026 自定义客户端
+<h1 align="center">Gen-Tau Client - RoboMaster 2026 自定义客户端</h1>
 
 <p align="center">
     <strong><em>华南农业大学 Taurus 战队的 C++/Qt 自定义客户端</em></strong>
