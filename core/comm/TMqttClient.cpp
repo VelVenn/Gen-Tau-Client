@@ -118,6 +118,14 @@ TMqttClient::TMqttClient(const string& _clientId, const string& _serverURI) :
 TMqttClient::~TMqttClient()
 {
 	tCommLogDebug("Shutting down client...");
+
+	try {
+		cli->disconnect(0)->wait_for(10ms);
+	} catch (const mqtt::exception& exc) {
+		tCommLogDebug(
+			"Failed to disconnect gracefully, cause: {}, force to disconnect now", exc.what()
+		);
+	}
 };
 
 void TMqttClient::subscribeAll()

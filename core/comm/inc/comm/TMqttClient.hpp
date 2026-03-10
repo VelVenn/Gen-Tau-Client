@@ -39,9 +39,9 @@ class TMqttClient : std::enable_shared_from_this<TMqttClient>
 	class Callback;
 
   private:
-	std::unique_ptr<mqtt::async_client>    cli;
-	std::unique_ptr<Callback>              cb;
 	std::unique_ptr<mqtt::connect_options> connOpt;
+	std::unique_ptr<Callback>              cb;
+	std::unique_ptr<mqtt::async_client>    cli;
 
 	TopicRegister topicRegister;
 
