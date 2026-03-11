@@ -1,4 +1,9 @@
-find_package(Protobuf REQUIRED)
+# Try to find Protobuf via CONFIG mode first (e.g. for Homebrew on macOS)
+find_package(Protobuf CONFIG QUIET)
+if(NOT Protobuf_FOUND)
+  # Fallback to MODULE mode (e.g. for system libraries on Linux)
+  find_package(Protobuf REQUIRED)
+endif()
 
 protobuf_generate(
   OUT_VAR PROTO_SRCS
