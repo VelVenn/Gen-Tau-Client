@@ -29,61 +29,58 @@ void GTCommViewModel::setupMqtt()
 	client->registerTopic("GameStatus", [this](const string& payload) {
 		Gentau::Topics::GameStatus msg;
 
-			msg.deserialize(&_serializer, QByteArrayView(payload.data(), payload.size()));
+		msg.deserialize(&_serializer, QByteArrayView(payload.data(), payload.size()));
 
-			if (_serializer.lastError() != QAbstractProtobufSerializer::Error::None) {
-				qWarning() << "Failed to deserialize GameStatus: "
-						   << _serializer.lastErrorString();
-				return;
-			}
+		if (_serializer.lastError() != QAbstractProtobufSerializer::Error::None) {
+			qWarning() << "Failed to deserialize GameStatus: " << _serializer.lastErrorString();
+			return;
+		}
 
-			QMetaObject::invokeMethod(this->parent(), [this, time = msg.stageCountdownSec()]() {
-				_battleTimeSec = time;
-				Q_EMIT battleTimeSecChanged();
-			});
+		QMetaObject::invokeMethod(this->parent(), [this, time = msg.stageCountdownSec()]() {
+			_battleTimeSec = time;
+			Q_EMIT battleTimeSecChanged();
+		});
 	});
 
 	client->registerTopic("GlobalUnitStatus", [this](const string& payload) {
 		Gentau::Topics::GlobalUnitStatus msg;
 
-			msg.deserialize(&_serializer, QByteArrayView(payload.data(), payload.size()));
+		msg.deserialize(&_serializer, QByteArrayView(payload.data(), payload.size()));
 
-			if (_serializer.lastError() != QAbstractProtobufSerializer::Error::None) {
-				qWarning() << "Failed to deserialize GlobalUnitStatus: "
-						   << _serializer.lastErrorString();
-				return;
+		if (_serializer.lastError() != QAbstractProtobufSerializer::Error::None) {
+			qWarning() << "Failed to deserialize GlobalUnitStatus: "
+					   << _serializer.lastErrorString();
+			return;
+		}
+
+		QMetaObject::invokeMethod(
+			this->parent(), [this, red = msg.baseHealth(), blue = msg.enemyBaseHealth()]() {
+				_redHp  = red;
+				_blueHp = blue;
+				Q_EMIT redHpChanged();
+				Q_EMIT blueHpChanged();
 			}
-
-			QMetaObject::invokeMethod(
-				this->parent(), [this, red = msg.baseHealth(), blue = msg.enemyBaseHealth()]() {
-					_redHp  = red;
-					_blueHp = blue;
-					Q_EMIT redHpChanged();
-					Q_EMIT blueHpChanged();
-				}
-			);
+		);
 	});
 
-	client->registerTopic(
-		"RobotDynamicStatus", [this](const string& payload) {
-			Gentau::Topics::RobotDynamicStatus msg;
+	client->registerTopic("RobotDynamicStatus", [this](const string& payload) {
+		Gentau::Topics::RobotDynamicStatus msg;
 
-				msg.deserialize(&_serializer, QByteArrayView(payload.data(), payload.size()));
+		msg.deserialize(&_serializer, QByteArrayView(payload.data(), payload.size()));
 
-				if (_serializer.lastError() != QAbstractProtobufSerializer::Error::None) {
-					qWarning() << "Failed to deserialize RobotDynamicStatus: "
-							   << _serializer.lastErrorString();
-					return;
-				}
-
-				QMetaObject::invokeMethod(
-					this->parent(), [this, hp = msg.currentHealth(), ammo = msg.remainingAmmo()]() {
-						_currentHp   = hp;
-						_currentAmmo = ammo;
-						Q_EMIT currentHpChanged();
-						Q_EMIT currentAmmoChanged();
-					}
-				);
+		if (_serializer.lastError() != QAbstractProtobufSerializer::Error::None) {
+			qWarning() << "Failed to deserialize RobotDynamicStatus: "
+					   << _serializer.lastErrorString();
+			return;
 		}
-	);
+
+		QMetaObject::invokeMethod(
+			this->parent(), [this, hp = msg.currentHealth(), ammo = msg.remainingAmmo()]() {
+				_currentHp   = hp;
+				_currentAmmo = ammo;
+				Q_EMIT currentHpChanged();
+				Q_EMIT currentAmmoChanged();
+			}
+		);
+	});
 }
