@@ -1,0 +1,98 @@
+@startuml core_struct
+skinparam componentStyle rectangle
+' skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 60
+skinparam defaultFontName "sans-serif"
+skinparam roundCorner 10
+
+cloud "External Environment" {
+    ' () "TCP Port" as tcp
+    [MQTT Broker] as broker
+    () "UDP Port" as udp
+}
+
+[POSIX System Call] as syscall
+
+package "Client Core" as core {
+    
+    package comm #F0FDF4 {
+        frame TMqttClient as mqtt {
+            () 发布接口 as pub
+            () 订阅接口 as sub
+        }
+    }
+
+    package img_trans #EFF6FF {
+        package net #FFFFFF {
+            frame TRecv {
+                [网络接收线程] as recv
+            }
+            frame TReassembly {
+                [分片重组器] as reasm
+            }
+        }
+        
+        package vid_render #FFFFFF {
+            frame TVidRender {
+                [渲染管线] as pipeline
+                [事件总线] as bus
+            }
+            frame TFramePool {
+                [内存池] as pool
+                [索引队列] as queue
+
+                queue -left-> pool : 记录
+            }
+        }
+    }
+    
+    package utils #d5ecec {
+        [TSignal] as signal
+        [TScheduler] as sched
+        [TLog] as logger
+    }
+}
+
+[Paho MQTT C++] as paho
+[Gstreamer] as gst
+[palacaze/sigslot] as sigslot
+[cameron314/readerwriterqueue] as lockfree
+[spdlog] as spd
+
+' 外部接口连线
+broker .down.> sub
+pub ..> broker
+udp .down.> recv : 监听
+
+syscall .left. recv : 系统 API 调用
+
+' 数据管线核心流转 (闭环无交叉)
+recv ..> reasm : 推送 UDP 分片
+reasm ..> pipeline : 推送完整帧
+pipeline .up..> queue : 归还槽位
+queue .up..> reasm : 申请槽位
+
+mqtt .up. paho : API 调用
+pipeline ..> gst : API 调用
+bus <. gst : 事件通知
+
+bus ..> signal : 事件通知
+sub ..> signal : 话题订阅通知
+
+signal .down. sigslot : API 调用
+logger .down. spd : 宏封装
+
+queue .down. lockfree
+
+note bottom of sched
+    单线程异步定时调度器
+end note
+
+' 布局优化辅助线 (隐藏)
+' tcp -[hidden]right- udp
+broker -[hidden]right- syscall
+comm -[hidden]right- img_trans
+img_trans -[hidden]down- utils
+
+@enduml
