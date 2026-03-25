@@ -10,9 +10,9 @@
 using namespace gentau;
 using namespace std;
 
-GTCommViewModel::GTCommViewModel(QObject* parent) :
+GTCommViewModel::GTCommViewModel(TMqttClient::SharedPtr _client, QObject* parent) :
 	QObject(parent),
-	client(TMqttClient::create("101"))
+	client(_client)
 {
 	if (!client) { throw invalid_argument("Client can't be nullptr"); }
 
@@ -83,4 +83,9 @@ void GTCommViewModel::setupMqtt()
 			}
 		);
 	});
+}
+
+void GTCommViewModel::requestClientSwitch(const QString& newClientId)
+{
+	Q_EMIT clientSwitchRequested(newClientId);
 }

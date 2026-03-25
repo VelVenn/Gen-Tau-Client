@@ -1,5 +1,7 @@
 #pragma once
 
+#include <qobject.h>
+#include <qtmetamacros.h>
 #include "comm/TMqttClient.hpp"
 
 #include <QObject>
@@ -15,8 +17,12 @@ class GTCommViewModel : public QObject
     Q_PROPERTY(int currentHp READ currentHp NOTIFY currentHpChanged)
     Q_PROPERTY(int maxHp READ maxHp NOTIFY maxHpChanged)
 
+
 public:
-    explicit GTCommViewModel(QObject* parent = nullptr);
+    // explicit GTCommViewModel(QObject* parent = nullptr);
+
+    explicit GTCommViewModel(gentau::TMqttClient::SharedPtr _client, QObject* parent = nullptr);
+
     ~GTCommViewModel() override;
 
     int redHp() const { return _redHp; }
@@ -26,6 +32,9 @@ public:
     int currentHp() const { return _currentHp; }
     int maxHp() const { return _maxHp; }
 
+public: 
+    Q_INVOKABLE void requestClientSwitch(const QString& newClientId);
+
 Q_SIGNALS:
     void redHpChanged();
     void blueHpChanged();
@@ -33,6 +42,8 @@ Q_SIGNALS:
     void currentAmmoChanged();
     void currentHpChanged();    
     void maxHpChanged();
+
+    void clientSwitchRequested(const QString& newClientId);
 
 private:
     void setupMqtt();
