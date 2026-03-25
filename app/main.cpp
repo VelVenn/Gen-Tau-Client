@@ -45,7 +45,7 @@ int main(int argc, char* argv[])
     qputenv("__GL_SYNC_TO_VBLANK", "0");
     qputenv("vblank_mode", "0");
     qputenv("_NET_WM_BYPASS_COMPOSITOR", "1");
-    qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
+    // qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 
     if (qEnvironmentVariableIsSet("WAYLAND_DISPLAY")) {
         qputenv("QT_QPA_PLATFORM", "wayland");
