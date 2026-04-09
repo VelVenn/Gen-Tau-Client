@@ -21,7 +21,7 @@
 
 #define T_LOG_TAG_IMG       "[Video Render] "
 #define RENDER_WAIT_FOREVER (0 && GEN_TAU_DEBUG)
-#define ENABLE_PTS 0
+#define ENABLE_PTS          0
 
 using namespace std;
 using namespace std::string_view_literals;
@@ -161,7 +161,8 @@ bool TVidRender::initBusThread()
 			IssueType         iType     = IssueType::UNKNOWN;
 			string            errSrc    = msg->src ? GST_ELEMENT_NAME(msg->src) : "Unknown";
 
-			gst_message_parse_error(msg, &err, &debugInfo);
+			asPipeErr ? gst_message_parse_error(msg, &err, &debugInfo)
+					  : gst_message_parse_warning(msg, &err, &debugInfo);
 
 			if (err) {
 				auto domain = err->domain;
