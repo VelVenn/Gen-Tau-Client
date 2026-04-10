@@ -173,75 +173,75 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 
   public:
 	/**
-	 * @brief: 尝试推送一帧数据到渲染管道中。
-	 * @return: 在帧数据成功推送到管道返回 true，否则返回 false。
-	 * @note: 该方法仅适用于测试目的，仅在 Debug 构建且 TVidRender::enableTestMode 
-	 *        为 true 时才会执行推送逻辑，其他情况下调用此方法将直接返回 false。
-	 * @note: 该方法当且仅当存在单一调用者时才是线程安全的，请勿在多个线程中并发调用此方法。
+	 * @brief 尝试推送一帧数据到渲染管道中。
+	 * @return 在帧数据成功推送到管道返回 true，否则返回 false。
+	 * @note 该方法仅适用于测试目的，仅在 Debug 构建且 `TVidRender::enableTestMode`
+	 *       为 true 时才会执行推送逻辑，其他情况下调用此方法将直接返回 false。
+	 * @note 该方法当且仅当存在单一调用者时才是线程安全的，请勿在多个线程中并发调用此方法。
 	 */
 	[[deprecated("Never use this for any general purpose")]]
 	bool __TEST_ONLY_tryPushFrame_UNSAFE_WHO_USE_WHO_SB_(FramePtr frame);
 
 	/**
-	 * @brief: 尝试推送一帧数据到渲染管道中。
-	 * @return: 在帧数据成功推送到管道返回 true，否则返回 false。
-	 * @note: 该方法仅能在 TReassembly 类内部被正常调用，其他地方调用此方法将导致编译
-	 *        错误。该方法当且仅当存在单一调用者时才是线程安全的，请勿在多个线程中并发调
-	 *        用此方法。
+	 * @brief 尝试推送一帧数据到渲染管道中。
+	 * @return 在帧数据成功推送到管道返回 true，否则返回 false。
+	 * @note 该方法仅能在 TReassembly 类内部被正常调用，其他地方调用此方法将导致编译
+	 *       错误。该方法当且仅当存在单一调用者时才是线程安全的，请勿在多个线程中并发调
+	 *       用此方法。
 	 */
 	bool tryPushFrame(TFramePool::FrameData&& frame, TReassemblyPasskey);
 
 	/**
-	 * @brief: 尝试获取一个可用的帧数据槽位。
-	 * @return: std::optional<TFramePool::FrameData> 
-	 * @note: 该方法仅能在 TReassembly 类内部被正常调用，其他地方调用此方法将导致编译
-	 *        错误。该方法当且仅当存在单一调用者时才是线程安全的，请勿在多个线程中并发调
-	 *        用此方法。
+	 * @brief 尝试获取一个可用的帧数据槽位。
+	 * @return std::optional<TFramePool::FrameData>
+	 * @note 该方法仅能在 TReassembly 类内部被正常调用，其他地方调用此方法将导致编译
+	 *       错误。该方法当且仅当存在单一调用者时才是线程安全的，请勿在多个线程中并发调
+	 *       用此方法。
 	 */
 	auto acquireFrameSlot(TReassemblyPasskey) { return framePool.acquire(); }
 
   public:
 	/** 
-	 * @brief: Let the pipeline start playing. 
+	 * @brief Let the pipeline start playing. 
 	 * 
-	 * @note: NOT MT-SAFE! Strongly recommend to call this from the main thread 
+	 * @note NOT MT-SAFE! Strongly recommend to call this from the main thread 
 	 * 		  or the thread that created the TVidRender instance.
 	 */
 	bool play();
 
 	/**
-	 * @brief: Pause the pipeline.
+	 * @brief Pause the pipeline.
 	 * 
-	 * @note: NOT MT-SAFE! Strongly recommend to call this from the main thread 
-	 * 		  or the thread that created the TVidRender instance.
+	 * @note NOT MT-SAFE! Strongly recommend to call this from the main thread 
+	 * 		 or the thread that created the TVidRender instance.
 	 */
 	bool pause();
 
 	/**
-	 * @brief: Restart the pipeline.
+	 * @brief Restart the pipeline.
 	 * 
-	 * @note: NOT MT-SAFE! Strongly recommend to call this from the main thread 
-	 * 		  or the thread that created the TVidRender instance. This method 
-	 *        will release all the resources to the hardware level. May cause 
-	 *        FATAL error on OS X.  
+	 * @note NOT MT-SAFE! Strongly recommend to call this from the main thread 
+	 * 		 or the thread that created the TVidRender instance. This method 
+	 *       will release all the resources to the hardware level. May cause 
+	 *       FATAL error on OS X.  
 	 */
 	bool restart();
 
 	/**
-	 * @brief: Flush the pipeline. Will only clear the data in the pipeline. 
+	 * @brief Flush the pipeline. Will only clear the data in the pipeline. 
 	 * 
-	 * @note: NOT MT-SAFE! Strongly recommend to call this from the main thread 
-	 * 		  or the thread that created the TVidRender instance.
+	 * @note NOT MT-SAFE! Strongly recommend to call this from the main thread 
+	 * 		 or the thread that created the TVidRender instance.
 	 */
 	bool flush();
 
 	/**
-	 * @brief: Stop the pipeline. Will set pipeline to NULL state and release all resources. 
+	 * @brief Stop the pipeline. Will set pipeline to NULL state and release all resources. 
 	 * 
-	 * @note: NOT MT-SAFE! Strongly recommend to call this from the main thread 
-	 * 		  or the thread that created the TVidRender instance. This method 
-	 *        will release all the resources to the hardware level. May cause 
-	 *        FATAL error on OS X.  
+	 * @note NOT MT-SAFE! Strongly recommend to call this from the main thread 
+	 * 		 or the thread that created the TVidRender instance. This method 
+	 *       will release all the resources to the hardware level. May cause 
+	 *       FATAL error on OS X.  
 	 */
 	bool stop();
 
@@ -250,9 +250,9 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 
   public:
 	/**
-	 * @brief: Link the video output sink to a QQuickItem. This method MUST be called before
-	 *         the pipeline is set to playing state.
-	 * @note: NOT MT-SAFE!
+	 * @brief Link the video output sink to a QQuickItem. This method MUST be called before
+	 *        the pipeline is set to playing state.
+	 * @note NOT MT-SAFE!
 	 */
 	void linkSinkWidget(QQuickItem* widget);
 
@@ -273,10 +273,10 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	);
 
 	/** 
-	 * @brief: create a shared pointer to TVidRender instance. 
+	 * @brief create a shared pointer to TVidRender instance. 
 	 *
-	 * @throws: std::runtime_error if the pipeline initialization failed, or 
-	 *          if file_path is provided in non-Debug builds.
+	 * @throws std::runtime_error if the pipeline initialization failed, or 
+	 *         if file_path is provided in non-Debug builds.
 	 */
 	[[nodiscard("Should not ignored the created TVidRender::SharedPtr")]] static SharedPtr create(
 		const char* file_path = nullptr, u64 _maxBufferBytes = 262'144
@@ -290,9 +290,9 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	}
 
 	/** 
-	 * @brief: create a shared pointer to TVidRender instance.
+	 * @brief create a shared pointer to TVidRender instance.
 	 *
-	 * @throws: std::runtime_error if the pipeline initialization failed.
+	 * @throws std::runtime_error if the pipeline initialization failed.
 	 */
 	[[nodiscard("Should not ignored the created TVidRender::SharedPtr")]] static SharedPtr create(
 		u64 _maxBufferBytes
@@ -302,9 +302,9 @@ class TVidRender : public std::enable_shared_from_this<TVidRender>
 	}
 
 	/**
-	 * @brief: Initialize the GStreamer context. Must be called before creating any TVidRender instance.
-	 * @param argc: Pointer to the argc parameter from the main function.
-	 * @param argv: Pointer to the argv parameter from the main function.
+	 * @brief Initialize the GStreamer context. Must be called before creating any TVidRender instance.
+	 * @param argc Pointer to the argc parameter from the main function.
+	 * @param argv Pointer to the argv parameter from the main function.
 	 */
 	static void initContext(int* argc, char** argv[]);
 

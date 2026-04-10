@@ -23,7 +23,7 @@ namespace gentau {
  * 在非 Debug 构建下该方法无任何实际效果与副作用，但仍然不建议调用以免造成误解。让底层组件自行处理数据的流转才是 TImgTrans 
  * 安全和正确的使用方式。
  *
- * @note: TImgTrans 的成员均有文档注释，强烈建议在使用前仔细阅读这些注释以避免误用。
+ * @note TImgTrans 的成员均有文档注释，强烈建议在使用前仔细阅读这些注释以避免误用。
  */
 class TImgTrans
 {

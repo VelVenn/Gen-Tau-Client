@@ -6,9 +6,9 @@
 #include "utils/TTypeRedef.hpp"
 
 #include <arpa/inet.h>
-#include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include <atomic>
@@ -112,7 +112,7 @@ class TRecv
 
   private:
 	static constexpr i32     kRecvBufferSize = 1 * 1024 * 1024;  // 1MB
-	static constexpr timeval kRecvTimeout    = { 0, 50'000 };   // 50ms
+	static constexpr timeval kRecvTimeout    = { 0, 50'000 };    // 50ms
 
   private:
 	// 这里必须放在所有字段的后面，以确保在析构时先停止线程，避免访问已销毁的成员变量。
@@ -120,64 +120,64 @@ class TRecv
 
   public:
 	/**
-	 * @brief: Start the receiving thread.
-	 * @return: 0 on success, else the POSIX errno code of the failure reason.
-	 *          - EBADF if the socket is not bound.
+	 * @brief Start the receiving thread.
+	 * @return 0 on success, else the POSIX errno code of the failure reason.
+	 *          - `EBADF` if the socket is not bound.
 	 *          - other errno codes from setsockopt() failure.
-	 * @note: Recieving thread will be abnormally stopped when these recv() 
-	 *        failures happened:
-	 *        - EBADF / EFAULT / EINVAL (FATAL error, will not retry)
-	 *        - ENOMEM (if it was triggered 5 times continuously) 
-	 * @note: NOT MT-SAFE! Ok to call this method multiple times, or call it when
-	 *        the thread is already running without restart the thread.
+	 * @note Recieving thread will be abnormally stopped when these recv() 
+	 *       failures happened:
+	 *       - `EBADF` / `EFAULT` / `EINVAL` (FATAL error, will not retry)
+	 *       - `ENOMEM` (if it was triggered 5 times continuously) 
+	 * @note NOT MT-SAFE! Ok to call this method multiple times, or call it when
+	 *       the thread is already running without restart the thread.
 	 */
 	int start();
 
 	/**
-	 * @brief: Request to stop the receiving thread and wait for it to finish.
-	 * @note: NOT MT-SAFE! Ok to call this method multiple times. In most cases,
-	 *        this method does not need to be called manually.
+	 * @brief Request to stop the receiving thread and wait for it to finish.
+	 * @note NOT MT-SAFE! Ok to call this method multiple times. In most cases,
+	 *       this method does not need to be called manually.
 	 */
 	void stop();
 
 	/**
-	 * @brief: Request to stop the receiving thread without waiting.
-	 * @note: NOT MT-SAFE! Ok to call this method multiple times. In most cases,
-	 *        this method does not need to be called manually.
+	 * @brief Request to stop the receiving thread without waiting.
+	 * @note NOT MT-SAFE! Ok to call this method multiple times. In most cases,
+	 *       this method does not need to be called manually.
 	 */
 	void stopAsync();
 
   public:
 	/**
-	 * @brief: Get the last received time point. if no packet has been received,
-	 *         it returns TimePoint::min().
+	 * @brief Get the last received time point. if no packet has been received,
+	 *        it returns TimePoint::min().
 	 * 
-	 * @note: MT-SAFE
+	 * @note MT-SAFE
 	 */
 	TimePoint getLastRecvTime() const noexcept { return lastRecvTime.load(); }
 
   public:
 	/**
-	 * @brief: Bind to a specific IPv4 address and port.
+	 * @brief Bind to a specific IPv4 address and port.
 	 *
-	 * @return: 0 on success, else the POSIX errno code of the failure reason.
-	 *          - EINVAL if the provided IP address string is invalid.
-	 *          - other errno codes from socket() and bind() error.
+	 * @return 0 on success, else the POSIX errno code of the failure reason.
+	 *         - `EINVAL` if the provided IP address string is invalid.
+	 *         - other errno codes from socket() and bind() error.
 	 * 
-	 * @note: NOT MT-SAFE! Will stop the current receiving thread if 
-	 *        it's running when calling this method.
+	 * @note NOT MT-SAFE! Will stop the current receiving thread if 
+	 *       it's running when calling this method.
 	 */
 	i32 bindV4(u16 port, const char* ip);
 
 	/**
-	 * @brief: Check if the socket is successfully bound.
-	 * @note: NOT MT-SAFE!
+	 * @brief Check if the socket is successfully bound.
+	 * @note NOT MT-SAFE!
 	 */
 	bool isBound() const noexcept { return updSock > -1; }
 
 	/**
-	 * @brief: Get the currently bound address. If not bound, returns std::nullopt.
-	 * @note: NOT MT-SAFE!
+	 * @brief Get the currently bound address. If not bound, returns std::nullopt.
+	 * @note NOT MT-SAFE!
 	 */
 	std::optional<V4Addr> getListenAddr() const noexcept
 	{
@@ -187,11 +187,11 @@ class TRecv
 
   public:
 	/**
-	 * @brief: Constructor of TRecv.
-	 * @param _reassembler: A shared pointer to a TReassembly who is used for reassembling received packets.
-	 * @param _port: The port to listen on.
-	 * @param _ip: The IP address to bind to, only accept dotted-decimal notation.
-	 * @throws: std::invalid_argument if reassembler is nullptr in Non-Debug build.
+	 * @brief Constructor of TRecv.
+	 * @param _reassembler A shared pointer to a TReassembly who is used for reassembling received packets.
+	 * @param _port The port to listen on.
+	 * @param _ip The IP address to bind to, only accept dotted-decimal notation.
+	 * @throws std::invalid_argument if reassembler is nullptr in Non-Debug build.
 	 */
 	explicit TRecv(
 		TReassembly::SharedPtr _reassembler, u16 _port = 3334, const char* _ip = "127.0.0.1"
@@ -199,12 +199,12 @@ class TRecv
 	~TRecv();
 
 	/**
-	 * @brief: create a unique pointer to TRecv instance. 
-	 * @param reassembler: A shared pointer to a TReassembly who is used for reassembling received packets.
-	 * @param port: The port to listen on.
-	 * @param ip: The IP address to bind to, only accept dotted-decimal notation (e.g., "127.0.0.1").
-	 * @return: A unique pointer to the created TRecv instance.
-	 * @throws: std::invalid_argument if reassembler is nullptr in Non-Debug build.
+	 * @brief create a unique pointer to TRecv instance. 
+	 * @param reassembler A shared pointer to a TReassembly who is used for reassembling received packets.
+	 * @param port The port to listen on.
+	 * @param ip The IP address to bind to, only accept dotted-decimal notation (e.g., "127.0.0.1").
+	 * @return A unique pointer to the created TRecv instance.
+	 * @throws std::invalid_argument if reassembler is nullptr in Non-Debug build.
 	 */
 	[[nodiscard("Should not ignored the created TRecv::UniPtr")]] static UniPtr createUni(
 		TReassembly::SharedPtr reassembler, u16 port = 3334, const char* ip = "127.0.0.1"
@@ -214,12 +214,12 @@ class TRecv
 	}
 
 	/**
-	 * @brief: create a shared pointer to TRecv instance. 
-	 * @param reassembler: A shared pointer to a TReassembly who is used for reassembling received packets.
-	 * @param port: The port to listen on.
-	 * @param ip: The IP address to bind to, only accept dotted-decimal notation (e.g., "127.0.0.1").
-	 * @return: A shared pointer to the created TRecv instance.
-	 * @throws: std::invalid_argument if reassembler is nullptr in Non-Debug build.
+	 * @brief create a shared pointer to TRecv instance. 
+	 * @param reassembler A shared pointer to a TReassembly who is used for reassembling received packets.
+	 * @param port The port to listen on.
+	 * @param ip The IP address to bind to, only accept dotted-decimal notation (e.g., "127.0.0.1").
+	 * @return A shared pointer to the created TRecv instance.
+	 * @throws std::invalid_argument if reassembler is nullptr in Non-Debug build.
 	 */
 	[[nodiscard("Should not ignored the created TRecv::SharedPtr")]] static SharedPtr createShared(
 		TReassembly::SharedPtr reassembler, u16 port = 3334, const char* ip = "127.0.0.1"
