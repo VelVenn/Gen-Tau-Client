@@ -26,7 +26,8 @@ AlignConsecutiveShortCaseStatements:
 AlignEscapedNewlines: Right 
 AlignOperands: Align
 AllowAllParametersOfDeclarationOnNextLine: "true"
-AllowShortBlocksOnASingleLine: "true"
+AllowShortCompoundRequirementOnASingleLine: true
+AllowShortBlocksOnASingleLine: Always
 AllowShortFunctionsOnASingleLine: Inline
 AllowShortLambdasOnASingleLine: Inline
 BinPackArguments: false
