@@ -344,15 +344,15 @@ message RobotPathPlanInfo
 // 用途: 雷达发送的机器人位置信息 (频率: 触发式发送)
 message RaderInfoToClient
 {
-	// is_high_light 枚举值: 0=否, 1=是, 2=是，但目标机器人定位模块离线
-
 	repeated RadarSingleRobotInfo robot_info = 1;
 }
 
 message RadarSingleRobotInfo
 {
-	optional uint32 target_pos_x  = 1;  // 目标位置 X(米)
-	optional uint32 target_pos_y  = 2;  // 目标位置 Y(米)
+	// is_high_light 枚举值: 0=否, 1=是, 2=是，但目标机器人定位模块离线
+
+	optional uint32 target_pos_x  = 1;  // 目标位置 X(cm)
+	optional uint32 target_pos_y  = 2;  // 目标位置 Y(cm)
 	optional uint32 is_high_light = 3;  // 是否特殊标识
 }
 
@@ -367,14 +367,20 @@ message CustomByteBlock
 // 用途: 科技核心运动状态同步 (频率: 1Hz)
 message TechCoreMotionStateSync
 {
-	// status 枚举值: 1:未进入装配状态, 2:已选择装配难度，科技核心移动中, 3:科技核心移动完成，可进行首个装配步骤, 4:上一个装配步骤已完成，可进行下一个装配步骤, 5:装配步骤已全部完成 6:已确认装配,科技核心移动中
+	// basic_state 枚举值: 1=初始位置, 2=运动中, 3=已达到对应位置
+	// putin_state 枚举值: 1=未放入, 2=已放入
+	// move_state 枚举值: 1=未平移, 2=已平移
+	// rotate_state 枚举值: 1=未旋转, 2=已旋转
 	// enemy_core_status 枚举值: 0=对方没有正在装配, 1=对方正在装配非四级难度, 2=对方正在装配四级难度
 
-	uint32 maximum_difficulty_level = 1;  // 当前可选择的最高装配难度等级
-	uint32 status                   = 2;  // 科技核心状态
-	uint32 enemy_core_status        = 3;  // 对方科技核心状态，仅己方四级装配可用时有效
-	uint32 remain_time_all          = 4;  // 己方装配剩余时长
-	uint32 remain_time_step         = 5;  // 己方单个步骤装配间隔剩余时长
+	optional uint32 maximum_difficulty_level = 1;  // 当前可选择的最高装配难度等级
+	optional uint32 basic_state              = 2;  // 科技核心基础状态
+	optional uint32 putin_state              = 3;  // 能量单元放入状态
+	optional uint32 move_state               = 4;  // 能量单元平移状态
+	optional uint32 rotate_state             = 5;  // 能量单元旋转状态
+	optional uint32 enemy_core_status        = 6;  // 对方科技核心状态 (仅己方正在四级装配时有效)
+	optional uint32 remain_time_all          = 7;  // 己方装配剩余时长 (有效时期同上)
+	optional uint32 remain_time_step         = 8;  // 己方单个步骤装配间隔剩余时长 (有效时期同上)
 }
 
 // 2.2.23 RobotPerformanceSelectionSync
@@ -385,9 +391,9 @@ message RobotPerformanceSelectionSync
 	// chassis 枚举值: 1=血量优先, 2=爆发优先, 3=英雄近战优先, 4=英雄远程优先
 	// sentry_control 枚举值: 0=哨兵自动控制, 1=哨兵半自动控制
 
-	uint32 shooter        = 1;  // 发射机构性能体系
-	uint32 chassis        = 2;  // 底盘性能体系
-	uint32 sentry_control = 3;  // 哨兵控制方式选择
+	optional uint32 shooter        = 1;  // 发射机构性能体系
+	optional uint32 chassis        = 2;  // 底盘性能体系
+	optional uint32 sentry_control = 3;  // 哨兵控制方式选择
 }
 
 // 2.2.26 DeployModeStatusSync
@@ -396,7 +402,7 @@ message DeployModeStatusSync
 {
 	// status 枚举值: 0=未部署, 1=已部署
 
-	uint32 status = 1;  // 当前部署模式状态
+	optional uint32 status = 1;  // 当前部署模式状态
 }
 
 // 2.2.28 RuneStatusSync
@@ -404,9 +410,9 @@ message DeployModeStatusSync
 message RuneStatusSync
 {
 	// rune_status 枚举值: 1:未激活, 2:正在激活, 3:已激活
-	uint32 rune_status    = 1;  // 当前能量机关状态枚举
-	uint32 activated_arms = 2;  // 当前已激活的灯臂数量
-	uint32 average_rings  = 3;  // 总环数
+	optional uint32 rune_status    = 1;  // 当前能量机关状态枚举
+	optional uint32 activated_arms = 2;  // 当前已激活的灯臂数量
+	optional float  average_rings  = 3;  // 平均环数 (仅大能量机关正在激活状态有效)
 }
 
 // 2.2.29 SentryStatusSync
@@ -415,16 +421,18 @@ message SentryStatusSync
 {
 	// posture_id 枚举值: 1=进攻姿态, 2=防御姿态, 3=移动姿态
 
-	uint32 posture_id  = 1;  // 姿态ID
-	bool   is_weakened = 2;  // 是否弱化
+	optional uint32 posture_id  = 1;  // 姿态ID
+	optional bool   is_weakened = 2;  // 是否弱化
 }
 
 // 2.2.31 DartSelectTargetStatusSync
 // 用途: 飞镖目标选择状态同步 (频率: 1Hz)
 message DartSelectTargetStatusSync
 {
-	uint32 target_id = 1;  // 目标 ID
-	bool   open      = 2;  // 闸门状态
+	// open 枚举值: 0=关闭, 1=开启中, 2=已开启
+
+	optional uint32 target_id = 1;  // 目标 ID
+	optional uint32 open      = 2;  // 闸门状态
 }
 
 // 2.2.32 SentryCtrlResult
@@ -432,18 +440,23 @@ message DartSelectTargetStatusSync
 message SentryCtrlResult
 {
 	// result_code 枚举值: 0:成功, 其他:失败
-	uint32 command_id  = 1;  // 对应的指令编号
-	uint32 result_code = 2;  // 执行结果码
+	optional uint32 command_id  = 1;  // 对应的指令编号
+	optional uint32 result_code = 2;  // 执行结果码
 }
 
 // 2.2.35 AirSupportStatusSync
 // 用途: 空中支援状态反馈 (频率: 1Hz)
 message AirSupportStatusSync
 {
-	// airsupport_status 枚举值: 0:未进行空中支援, 1:正在空中支援, 2:空中支援被对方锁定而无法开启
-	uint32 airsupport_status = 1;  // 空中支援状态
-	uint32 left_time         = 2;  // 免费空中支援剩余时间
-	uint32 cost_coins        = 3;  // 付费空中支援已花费金币
+	// airsupport_status 枚举值: 0:未进行空中支援, 1:正在空中支援
+	// is_being_targeted 枚举值: 0:未被照射, 1:正在被照射
+	// shooter_status 枚举值: 0:发射机构被锁定, 1:发射机构正常
+
+	optional uint32 airsupport_status = 1;  // 空中支援状态
+	optional uint32 left_time         = 2;  // 免费空中支援剩余时间
+	optional uint32 cost_coins        = 3;  // 付费空中支援已花费金币
+	optional uint32 is_being_targeted = 4;  // 当前激光检测模块是否正在检测被照射
+	optional uint32 shooter_status    = 5;  // 空中机器人被反制状态
 }
 
 // 3.0.0 Testing
