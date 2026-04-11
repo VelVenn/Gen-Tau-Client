@@ -26,9 +26,8 @@ namespace gentau {
 	TSignal<ClassName>                                                        onEOS;               \
 	TSignal<ClassName, gst::IssueType, std::string, std::string, std::string> onPipeError;         \
 	TSignal<ClassName, gst::IssueType, std::string, std::string, std::string> onPipeWarn;          \
-	TSignal<ClassName, gst::StateType, gst::StateType>                        onStateChanged;
-
-#define T_GST_BUS_SIGNAL_EMITTERS(ClassName)                                                       \
+	TSignal<ClassName, gst::StateType, gst::StateType>                        onStateChanged;      \
+                                                                                                   \
   protected:                                                                                       \
 	void emitOnEos()                                                                               \
 	{                                                                                              \
