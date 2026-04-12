@@ -11,7 +11,6 @@
 
 #include <exception>
 #include <future>
-#include <mutex>
 #include <stdexcept>
 #include <stop_token>
 #include <string_view>
@@ -31,24 +30,6 @@ constexpr gint64 MAX_RENDER_DELAY = -1;
 #else
 constexpr auto MAX_RENDER_DELAY = 25 * GST_MSECOND;
 #endif
-
-static TVidRender::StateType convGstState(GstState state) noexcept
-{
-	using StateType = TVidRender::StateType;
-
-	switch (state) {
-		case GST_STATE_NULL:
-			return StateType::NULL_STATE;
-		case GST_STATE_READY:
-			return StateType::READY;
-		case GST_STATE_PAUSED:
-			return StateType::PAUSED;
-		case GST_STATE_PLAYING:
-			return StateType::RUNNING;
-		default:
-			return StateType::NULL_STATE;
-	}
-}
 
 void TVidRender::onDecoderPadAdded(GstElement* decoder, GstPad* new_pad, gpointer user_data)
 {
@@ -103,7 +84,7 @@ GstElement* TVidRender::choosePrefDecoder(bool& isDynamic)
 		"d3d11h265dec",  // D3D11
 		"qsvh265dec",    // QuickSync (Intel)
 #elif defined(__APPLE__)
-		"vtdec_hw",       // General VideoToolbox hardware decoder
+		"vtdec_hw",  // General VideoToolbox hardware decoder
 		"vtdec",
 #endif
 		"avdec_h265",  // FFMPEG software decoder as fallback
@@ -153,45 +134,29 @@ bool TVidRender::initBusThread()
 
 		passThru.set_value();  // Notify main thread init success
 
-		auto issueParser = [this](GstMessage* msg, bool asPipeErr) {
-			g_autoptr(GError) err       = nullptr;
-			g_autofree gchar* debugInfo = nullptr;
-			IssueType         iType     = IssueType::UNKNOWN;
-			string            errSrc    = msg->src ? GST_ELEMENT_NAME(msg->src) : "Unknown";
+		auto issueParser = [this](GstMessage* msg) {
+			auto parsedIssueOpt = vid::issueParser(msg);
+			if (parsedIssueOpt) {
+				const auto& parsedIssue = *parsedIssueOpt;
 
-			asPipeErr ? gst_message_parse_error(msg, &err, &debugInfo)
-					  : gst_message_parse_warning(msg, &err, &debugInfo);
+				auto type    = parsedIssue.type;
+				auto src     = parsedIssue.src;
+				auto msg     = parsedIssue.msg;
+				auto dbgInfo = parsedIssue.debugInfo;
 
-			if (err) {
-				auto domain = err->domain;
+				if (parsedIssue.isError) {
+					onPipeError(type, src, msg, dbgInfo);
 
-				if (domain == GST_CORE_ERROR || domain == GST_LIBRARY_ERROR) {
-					iType = IssueType::PIPELINE_INTERNAL;
-				} else if (domain == GST_STREAM_ERROR) {
-					iType = IssueType::PIPELINE_STREAM;
-				} else if (domain == GST_RESOURCE_ERROR) {
-					iType = IssueType::PIPELINE_RESOURCE;
+					tImgTransLogError("Render Engine error: {} | Debug info : {}", msg, dbgInfo);
 				} else {
-					iType = IssueType::PIPELINE_OTHER;
+					onPipeWarn(type, src, msg, dbgInfo);
+
+					tImgTransLogWarn("Render Engine warning: {} | Debug info : {}", msg, dbgInfo);
 				}
-
-				if (asPipeErr) {
-					onPipeError(iType, errSrc, err->message, debugInfo ? debugInfo : "");
-
-					tImgTransLogError(
-						"Render Engine error: {} | Debug info : {}",
-						err->message,
-						debugInfo ? debugInfo : "(none)"
-					);
-				} else {
-					onPipeWarn(iType, errSrc, err->message, debugInfo ? debugInfo : "");
-
-					tImgTransLogWarn(
-						"Render Engine warning: {} | Debug info : {}",
-						err->message,
-						debugInfo ? debugInfo : "(none)"
-					);
-				}
+			} else {
+				tImgTransLogWarn(
+					"Failed to parse bus message as {}. Ignoring it...", GST_MESSAGE_TYPE_NAME(msg)
+				);
 			}
 		};
 
@@ -213,12 +178,9 @@ bool TVidRender::initBusThread()
 					onEOS();
 					break;
 				}
-				case GST_MESSAGE_ERROR: {
-					issueParser(msg, true);
-					break;
-				}
+				case GST_MESSAGE_ERROR:
 				case GST_MESSAGE_WARNING: {
-					issueParser(msg, false);
+					issueParser(msg);
 					break;
 				}
 				case GST_MESSAGE_STATE_CHANGED: {
@@ -230,7 +192,7 @@ bool TVidRender::initBusThread()
 							gst_element_state_get_name(oldState),
 							gst_element_state_get_name(newState)
 						);
-						onStateChanged(convGstState(oldState), convGstState(newState));
+						onStateChanged(vid::convGstState(oldState), vid::convGstState(newState));
 					}
 
 					break;
@@ -703,11 +665,11 @@ bool TVidRender::flush()
 	return true;
 }
 
-TVidRender::StateType TVidRender::getCurrentState()
+vid::StateType TVidRender::getCurrentState()
 {
 	GstState state;
 	gst_element_get_state(fixedPipe, &state, nullptr, 0);
-	return convGstState(state);
+	return vid::convGstState(state);
 }
 
 void TVidRender::linkSinkWidget(QQuickItem* widget)
@@ -717,16 +679,7 @@ void TVidRender::linkSinkWidget(QQuickItem* widget)
 
 void TVidRender::initContext(int* argc, char** argv[])
 {
-	static once_flag initFlag;
-	call_once(initFlag, [argc, argv]() {
-		gst_init(argc, argv);
-		tImgTransLogInfo(
-			"GStreamer context initialized. Version: {}.{}.{}",
-			GST_VERSION_MAJOR,
-			GST_VERSION_MINOR,
-			GST_VERSION_MICRO
-		);
-	});
+	vid::initGstContext(argc, argv);
 }
 
 void TVidRender::postTestError()
